@@ -54,10 +54,17 @@ Free sources, behind protocols so they're swappable and testable.
 
 - **`yfinance_source.py`** — resolves a query to an NSE/BSE symbol (bare `RELIANCE` → tries
   `RELIANCE.NS` then `.BO`), fetches OHLCV history and fundamentals from Yahoo Finance.
+- **`nse_source.py`** — `NSERealtimeSource`, a composite `PriceSource` that keeps history +
+  fundamentals from a yfinance fallback but **overlays a live NSE quote onto the latest bar**.
+  Cookie-primes NSE's JSON quote API; any failure returns `None` and leaves the yfinance data
+  untouched (never raises). Opt-in via config/flag.
 - **`news.py`** — Google News RSS headlines, scored with VADER sentiment.
 - **`base.py`** — `PriceSource`, `FundamentalsSource`, `NewsSource` `Protocol`s. Depending on
   the *shape* (not the concrete class) is what lets tests inject a mock source with zero network,
-  and lets a future NSE-direct source drop in without touching the engine.
+  and let the NSE-direct source drop in without touching the engine.
+- **`factory.py`** — `build_price_source(name, settings)` selects `yfinance` (default) or `nse`
+  from config, mirroring `llm/factory.py`. `snapshot.build_snapshot` calls it as the default, so
+  `DEFAULT_PRICE_SOURCE` flows to both single-stock analyze and the screener.
 
 ### 2. Indicators — `src/indi_analyst/indicators/technical.py`
 
@@ -121,9 +128,10 @@ breakage on Python 3.13 and keeps the math auditable. See
 
 The design is deliberately open at three seams:
 
-1. **New data source** — implement the `PriceSource` / `NewsSource` protocol in
-   `datasources/base.py` and inject it into `build_snapshot(...)` / `analyze(...)`. (This is how
-   NSE-direct real-time quotes will land.)
+1. **New data source** — implement the `PriceSource` / `NewsSource` protocol from
+   `datasources/base.py`, then either inject it into `build_snapshot(...)` / `analyze(...)` or
+   register it in `datasources/factory.py` so it's selectable via `DEFAULT_PRICE_SOURCE` /
+   `--price-source`. (This is exactly how `nse_source.py`'s real-time overlay landed.)
 2. **New LLM provider** — implement `verdict(...)` from `llm/base.py` and register it in
    `llm/factory.py`. Reuse `prompts.serialize()` and `parsing.parse_verdict()`.
 3. **New scoring/level logic** — `scoring.py` and `levels.py` are pure functions over a

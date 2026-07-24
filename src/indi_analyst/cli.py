@@ -15,6 +15,7 @@ import argparse
 import sys
 
 from indi_analyst.analysis.engine import analyze
+from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.models import Action, Recommendation
 from indi_analyst.screener import (
     resolve_preset,
@@ -130,8 +131,9 @@ def _build_filter(args) -> ScreenFilter | None:
 
 
 def _cmd_analyze(args) -> int:
+    price_source = build_price_source(args.price_source) if args.price_source else None
     try:
-        rec = analyze(args.query, provider=args.provider)
+        rec = analyze(args.query, provider=args.provider, price_source=price_source)
     except Exception as e:  # data errors, bad ticker, etc.
         print(f"Error analyzing '{args.query}': {e}", file=sys.stderr)
         return 1
@@ -143,12 +145,21 @@ def _cmd_screen(args) -> int:
     def _progress(done: int, total: int, symbol: str) -> None:
         print(f"\rScanning {done}/{total} … {symbol:<16}", end="", file=sys.stderr, flush=True)
 
+    realtime = (args.price_source or "").lower() == "nse"
+    price_source = build_price_source(args.price_source) if args.price_source else None
+    # A live-quote scan must not read the 12h snapshot cache, or it'd serve back a stale price.
+    use_cache = not args.no_cache and not realtime
+    if realtime and args.format != "json":
+        print("Real-time NSE scan: bypassing the snapshot cache; hits NSE once per symbol.",
+              file=sys.stderr)
+
     try:
         result = scan_universe(
             args.universe,
             provider=args.provider,
             limit=args.limit,
-            use_cache=not args.no_cache,
+            use_cache=use_cache,
+            price_source=price_source,
             on_progress=None if args.format == "json" else _progress,
             universe_fetcher=None,
         )
@@ -197,12 +208,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_an.add_argument("query", help="Ticker or symbol, e.g. RELIANCE, TCS, INFY.NS")
     p_an.add_argument("--provider", default=None,
                       help="LLM provider: ollama | anthropic | openai | gemini | rulebased.")
+    p_an.add_argument("--price-source", choices=["yfinance", "nse"], default=None,
+                      help="Price data: yfinance (default) | nse (live NSE quote over yfinance history).")
     p_an.set_defaults(func=_cmd_analyze)
 
     p_sc = sub.add_parser("screen", help="Scan a universe and rank the best ideas.")
     p_sc.add_argument("--universe", default="nifty50",
                       help="nifty50 | nifty200 | nifty500 | watchlist:SYM1,SYM2 | file:/path.csv")
     p_sc.add_argument("--provider", default=None, help="LLM provider (default: config).")
+    p_sc.add_argument("--price-source", choices=["yfinance", "nse"], default=None,
+                      help="Price data: yfinance (default) | nse (live). nse bypasses the snapshot cache.")
     p_sc.add_argument("--top", type=int, default=15, help="Show only the top N rows (0 = all).")
     p_sc.add_argument("--limit", type=int, default=None, help="Scan at most N constituents.")
     p_sc.add_argument("--preset", default=None,

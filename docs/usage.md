@@ -55,6 +55,29 @@ lowercase. Prints a formatted terminal report; exits non-zero on a bad ticker or
 
 ---
 
+## Real-time NSE prices (opt-in)
+
+By default prices come from yfinance, which lags the live NSE tape. Pass `--price-source nse` to
+overlay a **live NSE quote onto the latest bar** — so `last_close`, `change_pct`, and the
+latest-bar indicators reflect a near-live price:
+
+```bash
+uv run indi-analyst RELIANCE --price-source nse            # single-stock, live price
+uv run indi-analyst screen --universe watchlist:RELIANCE,TCS --price-source nse --provider rulebased
+```
+
+You can also make it the default without a flag: set `DEFAULT_PRICE_SOURCE=nse` in `.env` (or tick
+**Real-time NSE prices (beta)** in the dashboard sidebar).
+
+**Caveats.** NSE's endpoints are rate-limited and effectively **India-IP-only**; the history itself
+still comes from yfinance (NSE supplies only the live quote). Any NSE failure — 403, offline,
+non-India IP, market closed — **degrades silently to plain yfinance**, so output is never worse than
+the default. In screener mode a live scan **bypasses the 12-hour snapshot cache** (so it doesn't
+serve back a stale price) and hits NSE once per symbol, making it slower than a cached rule-based
+scan — use `--limit` on large universes.
+
+---
+
 ## Screener (scan a universe)
 
 Go from *"analyze this stock"* to *"which stocks should I look at?"*. The `screen` subcommand runs

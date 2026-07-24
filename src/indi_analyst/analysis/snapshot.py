@@ -7,8 +7,8 @@ from statistics import mean
 import pandas as pd
 
 from indi_analyst.config import Settings, get_settings
+from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.datasources.news import GoogleNewsSource
-from indi_analyst.datasources.yfinance_source import YFinanceSource
 from indi_analyst.indicators import technical
 from indi_analyst.models import StockSnapshot
 
@@ -22,7 +22,7 @@ def build_snapshot(
 ) -> StockSnapshot:
     """Resolve a query to a full snapshot. Sources are injectable for testing."""
     settings = settings or get_settings()
-    price_source = price_source or YFinanceSource()
+    price_source = price_source or build_price_source(settings=settings)
     news_source = news_source if news_source is not None else GoogleNewsSource()
 
     warnings: list[str] = []

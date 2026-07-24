@@ -47,8 +47,12 @@ at?"** Lives in `src/indi_analyst/screener/`, layered on the engine without touc
 
 ## 🧭 Phase 2 — Better, fresher data
 
-- **NSE-direct real-time quotes** — a `PriceSource` hitting NSE's endpoints for near-live prices,
-  with yfinance as fallback (drops in behind the existing protocol).
+- ✅ **NSE-direct real-time quotes** — `NSERealtimeSource` (`datasources/nse_source.py`) hits NSE's
+  quote API for a near-live price and **overlays it onto the latest yfinance bar**, so `last_close`,
+  `change_pct`, and latest-bar indicators are fresh. Opt-in (`--price-source nse`, dashboard toggle,
+  or `DEFAULT_PRICE_SOURCE=nse`); **degrades silently to yfinance** on any NSE failure (403, offline,
+  non-India IP). Selected via a new `datasources/factory.py`, works for single-stock analyze and the
+  screener (which bypasses the snapshot cache when live).
 - **Deeper fundamentals** — quarterly results, corporate actions, promoter/institutional holding,
   results calendar (e.g. screener.in-style scraping) behind a `FundamentalsSource`.
 - **Corporate-actions & earnings awareness** — flag upcoming results / ex-dividend dates as
