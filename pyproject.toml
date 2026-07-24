@@ -1,0 +1,38 @@
+[project]
+name = "indi-analyst"
+version = "0.1.0"
+description = "Investment-banking-grade analysis for Indian (NSE/BSE) stocks: buy/target/stop-loss with a facts-based thesis, from free data sources."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "yfinance>=0.2.40",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "feedparser>=6.0",
+    "vaderSentiment>=3.3.2",
+    "streamlit>=1.36",
+    "plotly>=5.20",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.30"]
+gemini = ["google-generativeai>=0.7"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+indi-analyst = "indi_analyst.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/indi_analyst"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
