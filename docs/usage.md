@@ -51,13 +51,60 @@ uv run indi-analyst INFY.NS --provider ollama
 
 Accepts a bare symbol (`RELIANCE`), an explicit Yahoo symbol (`RELIANCE.NS` / `.BO`), or
 lowercase. Prints a formatted terminal report; exits non-zero on a bad ticker or data error.
+(The bare form is shorthand for the `analyze` subcommand — `indi-analyst analyze RELIANCE`.)
+
+---
+
+## Screener (scan a universe)
+
+Go from *"analyze this stock"* to *"which stocks should I look at?"*. The `screen` subcommand runs
+the **same deterministic engine + per-stock verdict** across a whole universe, ranks by score, and
+prints a table (plus an optional top-ideas digest).
+
+```bash
+uv run indi-analyst screen --universe nifty50 --provider rulebased --top 15
+uv run indi-analyst screen --universe nifty50 --preset high-conviction-buys --digest
+uv run indi-analyst screen --universe watchlist:RELIANCE,TCS,INFY --min-score 55 --min-rr 2
+uv run indi-analyst screen --universe nifty500 --limit 50 --action BUY,ACCUMULATE --format json
+```
+
+**Universes** — `nifty50` / `nifty200` / `nifty500` (fetched live from NSE and cached),
+`watchlist:SYM1,SYM2` (inline), or `file:/path/to/list.csv` (a `Symbol`-column CSV or a
+newline/comma symbol list).
+
+**Filters** — `--preset` (`high-conviction-buys`, `oversold-quality`,
+`breakout-with-fundamentals`), then narrow further with `--min-score`, `--min-rr`, `--max-pe`,
+`--action BUY,ACCUMULATE`, `--sector "Information Technology,Energy"`. `--top N` limits rows shown
+(`--top 0` = all); `--limit N` caps how many constituents get scanned.
+
+**Speed & cost** — rule-based is fastest/free and needs no key; a cloud/Ollama provider runs a
+full verdict per stock, so start with `--limit` on the big indices. Snapshots are cached
+(`snapshot_cache_ttl_hours`), so re-scanning a universe is markedly faster the second time.
+
+**Offline** — the first scan fetches index membership from NSE and caches it; later scans work
+from that cache, and a bundled NIFTY 50 list is the last-resort fallback if NSE is unreachable.
+
+Every scan is persisted, so you can diff runs over time:
+
+```python
+from indi_analyst.screener.cache import ScanCache
+from indi_analyst.config import get_settings
+
+cache = ScanCache(get_settings().screener_cache_path)
+for d in cache.diff_scans("nifty50"):
+    if d["changed"]:
+        print(d["symbol"], d["old_action"], "->", d["new_action"], f"({d['score_delta']:+})")
+```
+
+In the **dashboard**, switch the sidebar **Mode** to *Screener* to pick a universe, apply a
+preset/min-score, run the scan, browse the ranked table, and drill into any row's full deep dive.
 
 ---
 
 ## As a Python library
 
-The engine returns a plain `Recommendation` pydantic model — ideal for scripts, notebooks, or a
-future screener/API.
+The engine returns a plain `Recommendation` pydantic model — ideal for scripts, notebooks, or the
+screener/API.
 
 ```python
 from indi_analyst.analysis.engine import analyze
@@ -117,6 +164,19 @@ from indi_analyst.analysis.engine import analyze_snapshot
 snap = build_snapshot("HDFCBANK")           # deterministic: data + indicators only
 rec = analyze_snapshot(snap, provider="ollama")
 ```
+
+### Screening in code
+
+```python
+from indi_analyst.screener import scan_universe, apply, rank, resolve_preset
+
+result = scan_universe("nifty50", provider="rulebased", limit=30)
+for row in rank(apply(result.rows, resolve_preset("high-conviction-buys")), by="score"):
+    print(row.symbol, row.action.value, row.score, f"{row.risk_reward:.1f}:1")
+```
+
+`scan_universe` accepts the same injectable `price_source` / `news_source` as `analyze`, so it
+runs fully offline in tests (see `tests/test_screener.py`).
 
 ---
 

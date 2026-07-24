@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # LLM request timeout (seconds)
     llm_timeout: float = 90.0
 
+    # --- Screener / batch-scan tunables ---
+    screener_cache_path: str = "~/.cache/indi-analyst/screener.db"
+    screener_max_workers: int = 8  # concurrent per-symbol scans (I/O-bound)
+    snapshot_cache_ttl_hours: float = 12  # reuse a cached snapshot within this window
+    universe_cache_ttl_days: float = 7  # refetch index constituents after this
+    nse_indices_base_url: str = "https://nsearchives.nseindia.com/content/indices"
+
     def configured_providers(self) -> list[str]:
         """Providers that have what they need to run (key present, etc.)."""
         providers = ["rulebased", "ollama"]  # always available (ollama may still fail to connect)

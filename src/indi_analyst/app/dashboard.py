@@ -15,6 +15,9 @@ from indi_analyst.config import get_settings
 from indi_analyst.datasources.yfinance_source import YFinanceSource
 from indi_analyst.indicators import technical
 from indi_analyst.models import Action, Recommendation
+from indi_analyst.screener import scan_universe, shortlist_digest
+from indi_analyst.screener.filters import apply, rank
+from indi_analyst.screener.models import PRESETS, ScanResult, ScreenFilter
 
 st.set_page_config(page_title="indi-analyst", page_icon="📈", layout="wide")
 
@@ -37,6 +40,11 @@ def _run(query: str, provider: str, period: str) -> Recommendation:
     settings = get_settings()
     settings.history_period = period
     return analyze(query, provider=provider, settings=settings)
+
+
+@st.cache_data(show_spinner=False, ttl=1800)
+def _scan(universe: str, provider: str, limit: int | None) -> ScanResult:
+    return scan_universe(universe, provider=provider, limit=limit)
 
 
 def _price_chart(df: pd.DataFrame) -> go.Figure:
@@ -107,33 +115,8 @@ def _recommendation_card(rec: Recommendation) -> None:
     c4.metric("Risk : Reward", f"{lv.risk_reward:.2f} : 1")
 
 
-def main() -> None:
-    st.title("📈 indi-analyst")
-    st.caption("Indian (NSE/BSE) stock analysis — buy / target / stop-loss with a facts-based thesis.")
-
-    settings = get_settings()
-    with st.sidebar:
-        st.header("Analyze")
-        query = st.text_input("Ticker / symbol", value="RELIANCE", help="e.g. RELIANCE, TCS, INFY.NS")
-        providers = settings.configured_providers()
-        default_idx = providers.index(settings.default_llm_provider) if settings.default_llm_provider in providers else 0
-        provider = st.selectbox("LLM provider", providers, index=default_idx)
-        period = st.selectbox("History", ["6mo", "1y", "2y", "5y"], index=1)
-        go_btn = st.button("Analyze", type="primary", width="stretch")
-        st.caption("Local Ollama & rule-based need no API key. Cloud providers read keys from .env.")
-
-    if not go_btn:
-        st.info("Enter a ticker in the sidebar and press **Analyze**.")
-        return
-
-    try:
-        with st.spinner(f"Analyzing {query} …"):
-            rec = _run(query.strip(), provider, period)
-            df = _history(rec.snapshot.symbol, period)
-    except Exception as e:
-        st.error(f"Could not analyze '{query}': {e}")
-        return
-
+def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
+    """Render a full single-stock deep dive (shared by the analyze view and screener drill-down)."""
     s, t = rec.snapshot, rec.snapshot.technicals
     st.subheader(f"{s.name or s.symbol}  ·  {s.symbol} ({s.exchange})")
     top = st.columns(4)
@@ -187,6 +170,114 @@ def main() -> None:
         for w in s.warnings:
             st.warning(w)
     st.caption(rec.disclaimer)
+
+
+def _single_stock_view(settings, provider: str) -> None:
+    with st.sidebar:
+        query = st.text_input("Ticker / symbol", value="RELIANCE", help="e.g. RELIANCE, TCS, INFY.NS")
+        period = st.selectbox("History", ["6mo", "1y", "2y", "5y"], index=1)
+        go_btn = st.button("Analyze", type="primary", width="stretch")
+
+    if not go_btn:
+        st.info("Enter a ticker in the sidebar and press **Analyze**.")
+        return
+
+    try:
+        with st.spinner(f"Analyzing {query} …"):
+            rec = _run(query.strip(), provider, period)
+            df = _history(rec.snapshot.symbol, period)
+    except Exception as e:
+        st.error(f"Could not analyze '{query}': {e}")
+        return
+
+    _deep_dive(rec, df)
+
+
+def _screener_view(settings, provider: str) -> None:
+    with st.sidebar:
+        universe = st.selectbox("Universe", ["nifty50", "nifty200", "nifty500"], index=0)
+        limit = st.slider("Max symbols to scan", 5, 100, 20, step=5,
+                          help="Caps the scan for speed. Rule-based provider is fastest.")
+        preset = st.selectbox("Preset", ["(none)", *PRESETS.keys()], index=0)
+        min_score = st.slider("Min score", 0, 100, 0, step=5)
+        scan_btn = st.button("Run scan", type="primary", width="stretch")
+
+    if scan_btn:
+        with st.spinner(f"Scanning {universe} (≤{limit} names) via {provider} …"):
+            st.session_state["scan"] = _scan(universe, provider, limit)
+
+    result: ScanResult | None = st.session_state.get("scan")
+    if result is None:
+        st.info("Pick a universe and press **Run scan** to rank ideas across it.")
+        return
+
+    # Build the active filter from preset + min-score.
+    flt = ScreenFilter(**PRESETS[preset].model_dump()) if preset != "(none)" else ScreenFilter()
+    if min_score:
+        flt = ScreenFilter(**{**flt.model_dump(), "min_score": float(min_score)})
+    active = flt if flt.model_dump(exclude_none=True) else None
+    rows = rank(apply(result.rows, active), by="score")
+
+    st.subheader(f"{result.universe} — {len(rows)} ideas")
+    st.caption(f"Scanned {result.ok_count} ok / {result.error_count} err · verdict via {result.provider}")
+    for w in result.warnings:
+        st.warning(w)
+
+    if not rows:
+        st.info("No rows matched the filter. Loosen the preset or min-score.")
+        return
+
+    table = [
+        {
+            "Symbol": r.symbol,
+            "Action": r.action.value if r.action else "—",
+            "Conv": r.conviction.value if r.conviction else "—",
+            "Score": r.score,
+            "Tech": r.technical_score,
+            "Fund": r.fundamental_score,
+            "Close": r.last_close,
+            "R:R": r.risk_reward,
+            "Sector": r.sector,
+        }
+        for r in rows
+    ]
+    st.dataframe(pd.DataFrame(table), width="stretch", hide_index=True)
+
+    with st.expander("Top-ideas digest", expanded=True):
+        digest_result = ScanResult(universe=result.universe, provider=result.provider, rows=rows)
+        st.text(shortlist_digest(digest_result, n=min(5, len(rows))))
+
+    st.markdown("---")
+    symbols = [r.symbol for r in rows]
+    pick = st.selectbox("Drill into a stock", symbols, index=0)
+    if st.button(f"Deep dive {pick}"):
+        try:
+            with st.spinner(f"Analyzing {pick} …"):
+                rec = _run(pick, provider, "1y")
+                df = _history(rec.snapshot.symbol, "1y")
+            _deep_dive(rec, df)
+        except Exception as e:
+            st.error(f"Could not analyze '{pick}': {e}")
+
+
+def main() -> None:
+    st.title("📈 indi-analyst")
+    st.caption("Indian (NSE/BSE) stock analysis — buy / target / stop-loss with a facts-based thesis.")
+
+    settings = get_settings()
+    with st.sidebar:
+        mode = st.radio("Mode", ["Single stock", "Screener"], horizontal=True)
+        st.header(mode)
+        providers = settings.configured_providers()
+        default_idx = providers.index(settings.default_llm_provider) if settings.default_llm_provider in providers else 0
+        provider = st.selectbox("LLM provider", providers, index=default_idx)
+
+    if mode == "Screener":
+        _screener_view(settings, provider)
+    else:
+        _single_stock_view(settings, provider)
+
+    st.sidebar.caption("Local Ollama & rule-based need no API key. Cloud providers read keys from .env.")
 
 
 main()

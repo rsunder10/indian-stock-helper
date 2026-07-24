@@ -22,22 +22,26 @@ Status legend: ✅ done · 🔜 next · 🧭 planned · 💡 idea
 
 ---
 
-## 🔜 Phase 1 — Screener / recommender
+## ✅ Phase 1 — Screener / recommender (done)
 
-**The headline next milestone: go from "analyze this stock" to "which stocks should I look at?"**
+**The headline milestone, delivered: go from "analyze this stock" to "which stocks should I look
+at?"** Lives in `src/indi_analyst/screener/`, layered on the engine without touching it.
 
-- **Universe & watchlists** — bundle NSE index constituents (NIFTY 50 / 200 / 500) as selectable
-  universes; user-defined watchlists.
-- **Batch scoring** — run the existing deterministic engine across a universe (concurrent fetches
-  + a cache layer) and **rank by quant score / setup quality**.
-- **Filters & presets** — screen by action, conviction, sector, valuation, momentum, risk-reward;
-  save named screens ("oversold quality", "breakout with fundamentals").
-- **LLM shortlisting** — feed the top-ranked snapshots to a provider for a "here are the 5 most
-  compelling ideas and why" digest, grounded in the numbers (not stock-picking from thin air).
-- **Ranked results view** — a sortable table + one-click drill-down into the full deep dive.
+- ✅ **Universe & watchlists** — NIFTY 50 / 200 / 500 fetched **live** from NSE and cached, plus
+  `watchlist:SYM1,SYM2` and `file:/path.csv` universes. A bundled NIFTY 50 is the offline fallback.
+- ✅ **Batch scoring** — `scan_universe` runs the deterministic engine + per-stock verdict across a
+  universe with a **concurrent thread pool** and a **snapshot cache**, ranked by quant score.
+- ✅ **Filters & presets** — screen by action, conviction, sector, valuation (P/E), and risk-reward;
+  named presets `high-conviction-buys`, `oversold-quality`, `breakout-with-fundamentals`.
+- ✅ **Shortlist digest** — a ranked "most compelling ideas" digest built from the top rows'
+  (already LLM-grounded) theses and numbers — grounded, never picking from thin air.
+- ✅ **Ranked results view** — CLI table (`indi-analyst screen`) and a Streamlit *Screener* mode
+  with a sortable table + one-click drill-down into the full deep dive.
+- ✅ **Persistence/enabler** — a **SQLite** layer caches snapshots + constituents and records every
+  scan, so re-scans are fast and runs can be **diffed over time** (`ScanCache.diff_scans`).
 
-*Enabler:* a **caching/persistence layer** (SQLite/parquet) so a universe scan is fast and
-repeatable, and results can be diffed over time.
+*Remaining polish (future):* parquet export, richer sort/column controls, and an LLM-authored
+(rather than assembled) comparative digest once a generic completion hook exists on providers.
 
 ---
 
