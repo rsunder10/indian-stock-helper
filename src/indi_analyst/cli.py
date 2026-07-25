@@ -15,6 +15,7 @@ import argparse
 import sys
 
 from indi_analyst.analysis.engine import analyze
+from indi_analyst.analysis.valuation import explain_valuation
 from indi_analyst.models import Action, Recommendation
 from indi_analyst.screener import (
     resolve_preset,
@@ -27,6 +28,11 @@ from indi_analyst.screener.models import ScanResult, ScreenFilter
 
 def _fmt_pct(x: float) -> str:
     return f"{x * 100:+.1f}%"
+
+
+def _plain(text: str) -> str:
+    """Strip the markdown emphasis markers used by the Streamlit view for a clean terminal line."""
+    return text.replace("**", "")
 
 
 def render(rec: Recommendation) -> str:
@@ -64,6 +70,20 @@ def render(rec: Recommendation) -> str:
             lines.append(
                 f"  Vs price : {_fmt_pct(val.margin_of_safety)} — {val.rating}{conf}"
             )
+        exp = explain_valuation(val, t.last_close, s.name or s.symbol)
+        if exp is not None:
+            lines.append("")
+            lines.append(f"  Why? {_plain(exp.headline)}")
+            lines.append("  How we got there:")
+            for note in exp.method_notes:
+                lines.append(f"    · {_plain(note)}")
+            if exp.blend_note:
+                lines.append(f"  {_plain(exp.blend_note)}")
+            if exp.margin_note:
+                lines.append(f"  {_plain(exp.margin_note)}")
+            if exp.confidence_note:
+                lines.append(f"  ({exp.confidence_note})")
+            lines.append("  The maths:")
         for m in val.methods:
             lines.append(f"    · {m.detail}")
     lines.append("")

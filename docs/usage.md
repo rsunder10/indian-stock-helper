@@ -65,6 +65,23 @@ block:
 FAIR VALUE
   Estimate : ₹1,650.00  (range ₹1,480–₹1,910)
   Vs price : +11.2% — Undervalued · HIGH confidence
+
+  Why? At ₹1,483, Reliance Industries trades below our fair-value estimate of ₹1,650 —
+  it looks undervalued, i.e. you may be paying less than the fundamentals say it's worth.
+  How we got there:
+    · Graham number → ₹1,690: a conservative 'floor' from earnings and book value —
+      Benjamin Graham's classic defensive yardstick for what the business is worth on its assets.
+    · Earnings power → ₹1,404: what today's earnings are worth at a P/E multiple the
+      company's growth can justify (a PEG≈1 rule of thumb).
+    · Dividend discount → ₹270: the present value of its future dividend stream (Gordon
+      growth model) — relevant because a dividend payer is worth the cash it will hand back.
+  Each method looks at value through a different lens; individually they landed between
+  ₹270 and ₹1,690. The fair value ₹1,650 is their simple average, so no single lens dominates.
+  Margin of safety is +11% — the discount to fair value, a cushion that absorbs estimate
+  error before you'd overpay. Bigger is safer.
+  (All three methods could run on the available data and were blended, so this is a
+  reasonably robust estimate.)
+  The maths:
     · √(22.5 × EPS ₹78.0 × BVPS ₹41.0) = ₹1,690
     · Fair P/E 18 (growth 18%) × EPS ₹78.0 = ₹1,404
     · Gordon: D ₹18.0 × (1+5%) / (12% − 5%) = ₹270
@@ -76,6 +93,14 @@ a growth-justified **fair P/E × EPS** (earnings power), and the **Gordon divide
 `(fair − price)/price`; the **rating** (Undervalued / Fairly valued / Overvalued) flips at the
 `MARGIN_OF_SAFETY` band; **confidence** reflects how many methods contributed (3 → HIGH). When the
 free source has no usable P/E, P/B, or dividend, the block is simply omitted rather than guessed.
+
+Before the raw formulas, the block leads with a **plain-English explanation** — a one-line verdict
+("trades below/above/close to fair value"), what each method means in everyday terms, how the
+methods blend into one number, and what the margin of safety implies for you as a buyer. This is
+pure string formatting over the already-computed numbers (`explain_valuation()` in
+`analysis/valuation.py`) — no extra LLM call, so it's instant and always agrees with the figures
+above it. The same explanation appears in the Streamlit dashboard's "Fair value" expander, under a
+"Why ₹X?" heading, with the raw formula table collapsed below it under "The maths".
 
 Tune the model via `.env` — `FAIR_VALUE_DISCOUNT_RATE`, `FAIR_VALUE_TERMINAL_GROWTH`,
 `FAIR_PE_BASE` / `FAIR_PE_FLOOR` / `FAIR_PE_CAP`, and `MARGIN_OF_SAFETY` (see `.env.example`).

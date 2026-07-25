@@ -83,7 +83,10 @@ breakage on Python 3.13 and keeps the math auditable. See
   Graham number, growth-justified fair-P/E (earnings power), and Gordon dividend-discount methods
   the free data supports into a single estimate, a low/high range, a margin of safety, and an
   under/fairly/over-valued rating. Each method keeps an explainable `detail`; missing data degrades
-  to an empty `Valuation` rather than an error.
+  to an empty `Valuation` rather than an error. `explain_valuation(val, price, name)` translates a
+  computed `Valuation` into plain-English prose (headline verdict, what each method measures, how
+  they blend, what the margin of safety means) — pure string formatting over already-computed
+  numbers, no LLM involved, so it's instant and can never contradict the figures it explains.
 - **`engine.py`** — the top-level entry point: `analyze(query, provider=...)` runs the whole
   pipeline and returns a `Recommendation`. Also `analyze_snapshot(...)` if you already have one.
 

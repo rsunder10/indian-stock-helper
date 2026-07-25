@@ -17,6 +17,7 @@ Missing data degrades gracefully — an empty `Valuation` (with a reason), never
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from math import sqrt
 
 from indi_analyst.config import Settings, get_settings
@@ -163,4 +164,126 @@ def compute_valuation(snapshot: StockSnapshot, settings: Settings | None = None)
         confidence=confidence,
         methods=methods,
         reasons=reasons,
+    )
+
+
+# --- Plain-English explanation ------------------------------------------------
+# Everything above is deterministic; the explanation below just translates those
+# numbers into digestible prose for the "why this value?" detailed view. No LLM
+# call is involved — the reasoning is the same math, said in words.
+
+# One plain sentence per method: what it measures and why it's a sensible lens.
+_METHOD_PLAIN: dict[str, str] = {
+    "Graham number": (
+        "a conservative 'floor' from earnings and book value — Benjamin Graham's "
+        "classic defensive yardstick for what the business is worth on its assets."
+    ),
+    "Earnings power": (
+        "what today's earnings are worth at a P/E multiple the company's growth "
+        "can justify (a PEG≈1 rule of thumb)."
+    ),
+    "Dividend discount": (
+        "the present value of its future dividend stream (Gordon growth model) — "
+        "relevant because a dividend payer is worth the cash it will hand back."
+    ),
+}
+
+_CONFIDENCE_PLAIN: dict[Conviction, str] = {
+    Conviction.HIGH: (
+        "All three methods could run on the available data and were blended, so this "
+        "is a reasonably robust estimate."
+    ),
+    Conviction.MEDIUM: (
+        "Two of the three methods could run on the available data — treat this as a "
+        "solid but not definitive guide."
+    ),
+    Conviction.LOW: (
+        "Only one method could run on the free data, so this is a rough, single-lens "
+        "estimate — lean on it lightly."
+    ),
+}
+
+
+@dataclass
+class ValuationExplanation:
+    """A digestible, plain-English account of how a fair value was reached."""
+
+    headline: str  # one-line "undervalued/overvalued/fair" gist vs the price
+    method_notes: list[str] = field(default_factory=list)  # one plain line per method
+    blend_note: str = ""  # how the individual estimates combine into the number
+    margin_note: str = ""  # what the margin of safety means for the investor
+    confidence_note: str = ""  # how much trust the estimate warrants
+
+
+def explain_valuation(
+    val: Valuation, price: float, name: str | None = None
+) -> ValuationExplanation | None:
+    """Translate a computed `Valuation` into plain prose. Returns None if no fair value."""
+    if val.fair_value is None:
+        return None
+
+    who = name or "the stock"
+    fv = val.fair_value
+    if val.rating == "Undervalued":
+        headline = (
+            f"At ₹{price:,.0f}, {who} trades **below** our fair-value estimate of "
+            f"₹{fv:,.0f} — it looks **undervalued**, i.e. you may be paying less than "
+            f"the fundamentals say it's worth."
+        )
+    elif val.rating == "Overvalued":
+        headline = (
+            f"At ₹{price:,.0f}, {who} trades **above** our fair-value estimate of "
+            f"₹{fv:,.0f} — it looks **overvalued**, i.e. the price already runs ahead "
+            f"of the fundamentals."
+        )
+    else:
+        headline = (
+            f"At ₹{price:,.0f}, {who} sits close to our fair-value estimate of "
+            f"₹{fv:,.0f} — it looks **fairly priced** on the fundamentals."
+        )
+
+    method_notes = [
+        f"{m.name} → ₹{m.fair_value:,.0f}: "
+        f"{_METHOD_PLAIN.get(m.name, 'an intrinsic-value estimate.')}"
+        for m in val.methods
+    ]
+
+    n = len(val.methods)
+    if n > 1:
+        blend_note = (
+            f"Each method looks at value through a different lens; individually they "
+            f"landed between ₹{val.low:,.0f} and ₹{val.high:,.0f}. The fair value ₹{fv:,.0f} "
+            f"is their simple average, so no single lens dominates."
+        )
+    else:
+        blend_note = (
+            f"Only one lens could be applied, so the fair value ₹{fv:,.0f} is that single "
+            f"method's estimate rather than a blend."
+        )
+
+    if val.margin_of_safety is not None:
+        mos = val.margin_of_safety * 100
+        if mos >= 0:
+            margin_note = (
+                f"Margin of safety is **+{mos:.0f}%** — the discount to fair value, a cushion "
+                f"that absorbs estimate error before you'd overpay. Bigger is safer."
+            )
+        else:
+            margin_note = (
+                f"Margin of safety is **{mos:.0f}%** — the price is that much *above* fair value, "
+                f"so there's no cushion; you'd be paying up for future growth to bail you out."
+            )
+    else:
+        margin_note = ""
+
+    confidence_note = (
+        _CONFIDENCE_PLAIN.get(val.confidence, "") if val.confidence else ""
+    )
+
+    return ValuationExplanation(
+        headline=headline,
+        method_notes=method_notes,
+        blend_note=blend_note,
+        margin_note=margin_note,
+        confidence_note=confidence_note,
     )

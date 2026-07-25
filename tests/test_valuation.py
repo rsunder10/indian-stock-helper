@@ -5,7 +5,7 @@ from __future__ import annotations
 from math import isclose, sqrt
 
 from indi_analyst.analysis.engine import analyze
-from indi_analyst.analysis.valuation import compute_valuation
+from indi_analyst.analysis.valuation import compute_valuation, explain_valuation
 from indi_analyst.config import Settings
 from indi_analyst.indicators import technical
 from indi_analyst.models import Conviction, Fundamentals, StockSnapshot
@@ -99,6 +99,28 @@ def test_fair_pe_cap_honored():
     eps = price / 15.0
     earnings = next(m for m in val.methods if m.name == "Earnings power")
     assert isclose(earnings.fair_value, round(20.0 * eps, 2), abs_tol=0.05)  # capped at 20, not 40
+
+
+def test_explain_valuation_is_digestible():
+    snap = _snap(Fundamentals(pe_ratio=18.0, pb_ratio=2.5, earnings_growth=0.12, dividend_yield=0.02))
+    val = compute_valuation(snap, Settings())
+    exp = explain_valuation(val, snap.technicals.last_close, name="Test Co")
+
+    assert exp is not None
+    # a headline that names the price, the fair value, and a plain verdict word
+    assert "Test Co" in exp.headline
+    assert val.rating.lower() in exp.headline.lower()
+    # one plain-English note per active method, each carrying its own ₹ estimate
+    assert len(exp.method_notes) == len(val.methods)
+    assert all("₹" in note for note in exp.method_notes)
+    # margin + confidence get spelled out for the reader
+    assert "Margin of safety" in exp.margin_note
+    assert exp.confidence_note
+
+
+def test_explain_valuation_none_when_no_fair_value():
+    val = compute_valuation(_snap(Fundamentals()), Settings())  # no usable fundamentals
+    assert explain_valuation(val, 100.0) is None
 
 
 def test_end_to_end_recommendation_has_valuation():

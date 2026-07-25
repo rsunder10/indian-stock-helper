@@ -11,6 +11,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from indi_analyst.analysis.engine import analyze
+from indi_analyst.analysis.valuation import explain_valuation
 from indi_analyst.config import get_settings
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.indicators import technical
@@ -164,6 +165,20 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
     if val.fair_value is not None:
         conf = f" · {val.confidence.value} confidence" if val.confidence else ""
         with st.expander(f"Fair value — ₹{val.fair_value:,.0f} ({val.rating}{conf})"):
+            exp = explain_valuation(val, t.last_close, s.name or s.symbol)
+            if exp is not None:
+                st.markdown(f"#### Why ₹{val.fair_value:,.0f}?")
+                st.markdown(exp.headline)
+                st.markdown("**How we got there**")
+                for note in exp.method_notes:
+                    st.markdown(f"- {note}")
+                if exp.blend_note:
+                    st.markdown(exp.blend_note)
+                if exp.margin_note:
+                    st.info(exp.margin_note)
+                if exp.confidence_note:
+                    st.caption(f"ℹ️ {exp.confidence_note}")
+                st.markdown("**The maths**")
             st.caption(
                 f"Range ₹{val.low:,.0f}–₹{val.high:,.0f}"
                 + (f"  ·  margin of safety {val.margin_of_safety * 100:+.1f}%"
