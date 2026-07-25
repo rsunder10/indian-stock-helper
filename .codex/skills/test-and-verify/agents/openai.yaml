@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test and Verify"
+  short_description: "Run the right checks before handing off changes."
+  default_prompt: "Use $test-and-verify to validate this change and report the evidence."

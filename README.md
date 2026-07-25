@@ -77,6 +77,17 @@ Full write-up in **[docs/architecture.md](docs/architecture.md)**.
 | [docs/methodology.md](docs/methodology.md) | How indicators, trade levels, and the quant score are computed |
 | [docs/roadmap.md](docs/roadmap.md) | Where this is going (free-source hardening, backtesting, …) |
 
+## AI coding assistants
+
+Project guidance is checked in for both Claude Code and Codex:
+
+- Claude Code loads [`CLAUDE.md`](CLAUDE.md) and project skills from [`.claude/skills/`](.claude/skills/).
+- Codex loads [`AGENTS.md`](AGENTS.md) and project skills from [`.codex/skills/`](.codex/skills/).
+
+The shared skills cover quantitative analysis, data-source/provider changes, testing and verification,
+and documentation alignment. Claude users can invoke them with `/skill-name`; Codex users can ask for
+the matching `$skill-name` or rely on the skill references in `AGENTS.md`.
+
 ---
 
 ## Providers at a glance

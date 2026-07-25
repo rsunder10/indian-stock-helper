@@ -1,0 +1,4 @@
+interface:
+  display_name: "Data Source Change"
+  short_description: "Make external data integrations resilient and testable."
+  default_prompt: "Use $data-source-change when changing data sources, providers, caching, or external API behavior."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Quantitative Analysis"
+  short_description: "Protect numeric analysis correctness."
+  default_prompt: "Use $quantitative-analysis when changing or reviewing quantitative stock-analysis logic."

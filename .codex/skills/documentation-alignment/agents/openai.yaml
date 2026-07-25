@@ -1,0 +1,4 @@
+interface:
+  display_name: "Documentation Alignment"
+  short_description: "Keep project docs accurate as code evolves."
+  default_prompt: "Use $documentation-alignment to update and check the project documentation for this change."
