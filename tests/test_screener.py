@@ -38,12 +38,6 @@ class MockMultiSource:
         )
 
 
-def _fake_fetcher(members: list[Constituent]):
-    def _fetch(name: str, base_url: str):
-        return list(members)
-    return _fetch
-
-
 def _settings(tmp_path):
     s = get_settings()
     s.screener_cache_path = str(tmp_path / "scan.db")
@@ -109,31 +103,13 @@ def test_scan_uses_snapshot_cache(tmp_path):
     assert source.history_calls == first
 
 
-# --- Universe loading + fallback -------------------------------------------
-
-def test_load_universe_uses_live_fetch(tmp_path):
+def test_load_universe_uses_bundled_data_without_network(tmp_path):
     settings = _settings(tmp_path)
     cache = ScanCache(settings.screener_cache_path)
-    members = [Constituent(symbol="RELIANCE.NS", name="Reliance", sector="Energy")]
-    got = load_universe("nifty50", settings=settings, cache=cache,
-                        fetcher=_fake_fetcher(members))
-    assert got[0].symbol == "RELIANCE.NS"
+    got = load_universe("nifty50", settings=settings, cache=cache)
 
-
-def test_load_universe_falls_back_to_bundled_on_fetch_failure(tmp_path):
-    settings = _settings(tmp_path)
-    cache = ScanCache(settings.screener_cache_path)
-
-    def failing_fetch(name, base_url):
-        raise RuntimeError("simulated NSE 403")
-
-    warnings: list[str] = []
-    got = load_universe("nifty50", settings=settings, cache=cache,
-                        fetcher=failing_fetch, warnings=warnings)
-    # Bundled NIFTY 50 fallback kicks in.
-    assert any(m.symbol == "RELIANCE.NS" for m in got)
     assert len(got) >= 40
-    assert warnings  # a degradation note was recorded
+    assert any(m.symbol == "RELIANCE.NS" for m in got)
 
 
 def test_load_universe_watchlist_and_unknown():

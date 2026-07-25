@@ -9,7 +9,7 @@ for the quickstart.
 | [usage.md](usage.md) | Dashboard, CLI, and using the engine as a Python library |
 | [providers.md](providers.md) | Configuring each LLM provider + every `.env` setting |
 | [methodology.md](methodology.md) | How indicators, trade levels, and the quant score are computed |
-| [roadmap.md](roadmap.md) | Where the project is going (screener, real-time data, backtesting…) |
+| [roadmap.md](roadmap.md) | Where the project is going (free-source hardening, backtesting…) |
 
 ## TL;DR
 

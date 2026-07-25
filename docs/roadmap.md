@@ -4,6 +4,10 @@ Where `indi-analyst` is headed. The MVP is a **single-stock deep-dive analyzer**
 is a **facts-based, provider-agnostic research assistant** that not only analyzes a stock you name
 but **surfaces the ones worth looking at** — while staying honest, explainable, and free to run.
 
+The project is now explicitly **free-source first**: the core must work without an exchange-data
+subscription, broker account, paid API key, or fragile website scraping. This means the product
+targets delayed/EOD analysis rather than promising exchange-grade real-time quotes.
+
 The architecture was built for this: the engine returns a plain `Recommendation`, data sources
 and LLM providers sit behind protocols, so most of what follows layers on **without touching the
 core**.
@@ -27,8 +31,9 @@ Status legend: ✅ done · 🔜 next · 🧭 planned · 💡 idea
 **The headline milestone, delivered: go from "analyze this stock" to "which stocks should I look
 at?"** Lives in `src/indi_analyst/screener/`, layered on the engine without touching it.
 
-- ✅ **Universe & watchlists** — NIFTY 50 / 200 / 500 fetched **live** from NSE and cached, plus
-  `watchlist:SYM1,SYM2` and `file:/path.csv` universes. A bundled NIFTY 50 is the offline fallback.
+- ✅ **Universe & watchlists** — bundled NIFTY 50 fallback plus `watchlist:SYM1,SYM2` and
+  `file:/path.csv` universes. The free-first product path uses bundled/local constituents and cached
+  snapshots without live index refresh.
 - ✅ **Batch scoring** — `scan_universe` runs the deterministic engine + per-stock verdict across a
   universe with a **concurrent thread pool** and a **snapshot cache**, ranked by quant score.
 - ✅ **Filters & presets** — screen by action, conviction, sector, valuation (P/E), and risk-reward;
@@ -45,27 +50,33 @@ at?"** Lives in `src/indi_analyst/screener/`, layered on the engine without touc
 
 ---
 
-## 🧭 Phase 2 — Better, fresher data
+## 🔜 Phase 2 — Free-source hardening and data quality
 
-- ✅ **NSE-direct real-time quotes** — `NSERealtimeSource` (`datasources/nse_source.py`) hits NSE's
-  quote API for a near-live price and **overlays it onto the latest yfinance bar**, so `last_close`,
-  `change_pct`, and latest-bar indicators are fresh. Opt-in (`--price-source nse`, dashboard toggle,
-  or `DEFAULT_PRICE_SOURCE=nse`); **degrades silently to yfinance** on any NSE failure (403, offline,
-  non-India IP). Selected via a new `datasources/factory.py`, works for single-stock analyze and the
-  screener (which bypasses the snapshot cache when live).
-- **Deeper fundamentals** — quarterly results, corporate actions, promoter/institutional holding,
-  results calendar (e.g. screener.in-style scraping) behind a `FundamentalsSource`.
-- **Corporate-actions & earnings awareness** — flag upcoming results / ex-dividend dates as
-  catalysts and as risk windows.
-- **Richer sentiment** — beyond headlines: earnings-call tone, filings, and optionally social
-  signals; swap VADER for a stronger model where it helps.
+The next milestone is reliability, not lower latency.
+
+- 🔜 **Harden the yfinance path** — remove invalid trailing OHLCV rows, validate monotonic dates and
+  OHLC relationships, record the source/as-of time, and surface data-quality warnings instead of
+  allowing `NaN` prices or trade levels into a recommendation.
+- 🔜 **Free-source cache and rate discipline** — use SQLite/parquet snapshots, request throttling,
+  retries with backoff, and cache-aware scans so normal use does not hammer public endpoints.
+- 🔜 **Local universe packs** — ship versioned NIFTY 50/200/500 constituent files or allow users to
+  provide their own CSVs. A scan should not require a live exchange request just to discover symbols.
+- 🔜 **Optional low-volume adapter experiments** — evaluate providers with an explicit free tier,
+  such as Alpha Vantage's daily/BSE sample coverage, but keep them opt-in because free quotas and
+  exchange coverage can change. No provider becomes a hard dependency until its limits and terms are
+  verified.
+- 🔜 **Deeper free fundamentals** — add public-company filings, annual/quarterly reports, corporate
+  actions, and results dates only where the source is legally accessible and the data can be cited.
+- 🔜 **Richer sentiment** — improve headline coverage and sentiment while keeping Google News RSS as
+  the no-key baseline.
 
 ---
 
 ## 🧭 Phase 3 — Product & UX
 
 - **FastAPI + JS frontend** — promote the reusable core to a proper API + web app (multi-page,
-  faster, shareable), with Streamlit remaining the quick-iteration playground.
+  faster, shareable), with Streamlit remaining the quick-iteration playground. Include visible source,
+  timestamp, delay, and data-quality status on every analysis.
 - **Report export** — one-click **PDF / Markdown** research note per stock (and per screen).
 - **Alerts** — price/level/score-change alerts on watchlists (email/Telegram/desktop).
 - **Portfolio view** — track holdings, aggregate exposure, and per-position level monitoring.
@@ -103,7 +114,9 @@ Whatever gets added, these hold:
 1. **Deterministic core stays LLM-free** — you always get numbers, even offline.
 2. **No hard dependency on any one model** — providers stay swappable, with rule-based fallback.
 3. **Everything explainable** — every score and level has a stated reason.
-4. **Free-source friendly** — the default path never requires a paid key.
+4. **Free-source first** — the default path never requires a paid key, broker account, or exchange
+   subscription; it does not claim real-time accuracy.
+5. **Data honesty** — every recommendation carries source, timestamp, freshness, and quality warnings.
 
 ---
 

@@ -107,8 +107,8 @@ class ScanCache:
     ) -> tuple[list[Constituent], bool] | None:
         """Return (constituents, is_fresh) or None if nothing cached.
 
-        `is_fresh` is False when the cache exists but is older than ttl_days — the caller
-        can then try a live refresh yet still fall back to this stale copy if that fails.
+        `is_fresh` is False when the cache exists but is older than ttl_days; callers can
+        still use the stale copy when no local refresh is available.
         """
         with self._lock, self._connect() as conn:
             rows = conn.execute(

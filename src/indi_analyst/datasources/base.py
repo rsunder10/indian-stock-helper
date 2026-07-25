@@ -1,8 +1,8 @@
 """Protocols for pluggable data sources.
 
 Keeping these as typing.Protocol lets the analysis layer depend on the shape, not the
-concrete yfinance implementation — so a mocked source in tests (or an NSE-direct source
-later) drops in without touching the engine.
+    concrete yfinance implementation — so a mocked or future free source drops in without
+    touching the engine.
 """
 
 from __future__ import annotations

@@ -75,7 +75,7 @@ Full write-up in **[docs/architecture.md](docs/architecture.md)**.
 | [docs/usage.md](docs/usage.md) | Dashboard, CLI, and using the engine as a Python library |
 | [docs/providers.md](docs/providers.md) | Configuring each LLM provider + all `.env` settings |
 | [docs/methodology.md](docs/methodology.md) | How indicators, trade levels, and the quant score are computed |
-| [docs/roadmap.md](docs/roadmap.md) | Where this is going (screener, real-time data, backtesting, …) |
+| [docs/roadmap.md](docs/roadmap.md) | Where this is going (free-source hardening, backtesting, …) |
 
 ---
 
@@ -112,9 +112,10 @@ src/indi_analyst/
 
 ## Roadmap (short version)
 
-- **Next:** multi-stock **screener / recommender** — rank a universe and surface buy candidates.
-- Real-time NSE quotes; report export (PDF/Markdown); watchlists & alerts.
-- FastAPI + JS frontend; backtesting the level logic; more data sources.
+- **Next:** free-source hardening — reliable delayed/EOD data, quality checks, caching, and local
+  universe packs.
+- Report export (PDF/Markdown), watchlists & alerts, and data freshness metadata.
+- Backtesting, FastAPI + JS frontend, and carefully evaluated optional free-tier adapters.
 
 Full plan with milestones in **[docs/roadmap.md](docs/roadmap.md)**.
 

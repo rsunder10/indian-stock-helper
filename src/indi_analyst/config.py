@@ -38,13 +38,6 @@ class Settings(BaseSettings):
     history_period: str = "1y"  # yfinance period for indicator computation
     news_max_items: int = 8
 
-    # --- Data / price source selection ---
-    # one of: yfinance (default) | nse (NSE-direct live quote overlaid on yfinance history)
-    default_price_source: str = "yfinance"
-    nse_quote_base_url: str = "https://www.nseindia.com"
-    nse_quote_timeout: float = 10.0  # per-request timeout for the NSE quote API
-    nse_quote_max_concurrency: int = 4  # cap simultaneous NSE hits (screener fan-out)
-
     # LLM request timeout (seconds)
     llm_timeout: float = 90.0
 
@@ -53,7 +46,6 @@ class Settings(BaseSettings):
     screener_max_workers: int = 8  # concurrent per-symbol scans (I/O-bound)
     snapshot_cache_ttl_hours: float = 12  # reuse a cached snapshot within this window
     universe_cache_ttl_days: float = 7  # refetch index constituents after this
-    nse_indices_base_url: str = "https://nsearchives.nseindia.com/content/indices"
 
     def configured_providers(self) -> list[str]:
         """Providers that have what they need to run (key present, etc.)."""

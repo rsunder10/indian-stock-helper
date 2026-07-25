@@ -92,7 +92,6 @@ def scan_universe(
     max_workers: int | None = None,
     on_progress: ProgressCb | None = None,
     cache: ScanCache | None = None,
-    universe_fetcher=None,
 ) -> ScanResult:
     """Scan every constituent of `universe` and return a score-ranked `ScanResult`.
 
@@ -106,9 +105,8 @@ def scan_universe(
         cache = ScanCache(settings.screener_cache_path)
 
     warnings: list[str] = []
-    load_kwargs = {} if universe_fetcher is None else {"fetcher": universe_fetcher}
     members = load_universe(
-        universe, settings=settings, cache=cache, warnings=warnings, **load_kwargs
+        universe, settings=settings, cache=cache, warnings=warnings
     )
     if limit is not None:
         members = members[:limit]

@@ -30,26 +30,23 @@ _ACTION_COLOR = {
 }
 
 
-# `price_source` (a name: "yfinance" | "nse") is a cache-key arg so toggling real-time busts caches.
 @st.cache_data(show_spinner=False, ttl=900)
-def _history(symbol: str, period: str, price_source: str) -> pd.DataFrame:
-    return build_price_source(price_source).history(symbol, period=period)
+def _history(symbol: str, period: str) -> pd.DataFrame:
+    return build_price_source().history(symbol, period=period)
 
 
 @st.cache_data(show_spinner=False, ttl=900)
-def _run(query: str, provider: str, period: str, price_source: str) -> Recommendation:
+def _run(query: str, provider: str, period: str) -> Recommendation:
     settings = get_settings()
     settings.history_period = period
     return analyze(query, provider=provider, settings=settings,
-                   price_source=build_price_source(price_source, settings))
+                   price_source=build_price_source(settings))
 
 
 @st.cache_data(show_spinner=False, ttl=1800)
-def _scan(universe: str, provider: str, limit: int | None, price_source: str) -> ScanResult:
-    # Real-time scans must not read the snapshot cache, or it'd mask the live price.
+def _scan(universe: str, provider: str, limit: int | None) -> ScanResult:
     return scan_universe(universe, provider=provider, limit=limit,
-                         price_source=build_price_source(price_source),
-                         use_cache=price_source != "nse")
+                         price_source=build_price_source(), use_cache=True)
 
 
 def _price_chart(df: pd.DataFrame) -> go.Figure:
@@ -177,7 +174,7 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
     st.caption(rec.disclaimer)
 
 
-def _single_stock_view(settings, provider: str, price_source: str) -> None:
+def _single_stock_view(settings, provider: str) -> None:
     with st.sidebar:
         query = st.text_input("Ticker / symbol", value="RELIANCE", help="e.g. RELIANCE, TCS, INFY.NS")
         period = st.selectbox("History", ["6mo", "1y", "2y", "5y"], index=1)
@@ -189,8 +186,8 @@ def _single_stock_view(settings, provider: str, price_source: str) -> None:
 
     try:
         with st.spinner(f"Analyzing {query} …"):
-            rec = _run(query.strip(), provider, period, price_source)
-            df = _history(rec.snapshot.symbol, period, price_source)
+            rec = _run(query.strip(), provider, period)
+            df = _history(rec.snapshot.symbol, period)
     except Exception as e:
         st.error(f"Could not analyze '{query}': {e}")
         return
@@ -198,7 +195,7 @@ def _single_stock_view(settings, provider: str, price_source: str) -> None:
     _deep_dive(rec, df)
 
 
-def _screener_view(settings, provider: str, price_source: str) -> None:
+def _screener_view(settings, provider: str) -> None:
     with st.sidebar:
         universe = st.selectbox("Universe", ["nifty50", "nifty200", "nifty500"], index=0)
         limit = st.slider("Max symbols to scan", 5, 100, 20, step=5,
@@ -209,7 +206,7 @@ def _screener_view(settings, provider: str, price_source: str) -> None:
 
     if scan_btn:
         with st.spinner(f"Scanning {universe} (≤{limit} names) via {provider} …"):
-            st.session_state["scan"] = _scan(universe, provider, limit, price_source)
+            st.session_state["scan"] = _scan(universe, provider, limit)
 
     result: ScanResult | None = st.session_state.get("scan")
     if result is None:
@@ -258,8 +255,8 @@ def _screener_view(settings, provider: str, price_source: str) -> None:
     if st.button(f"Deep dive {pick}"):
         try:
             with st.spinner(f"Analyzing {pick} …"):
-                rec = _run(pick, provider, "1y", price_source)
-                df = _history(rec.snapshot.symbol, "1y", price_source)
+                rec = _run(pick, provider, "1y")
+                df = _history(rec.snapshot.symbol, "1y")
             _deep_dive(rec, df)
         except Exception as e:
             st.error(f"Could not analyze '{pick}': {e}")
@@ -276,18 +273,12 @@ def main() -> None:
         providers = settings.configured_providers()
         default_idx = providers.index(settings.default_llm_provider) if settings.default_llm_provider in providers else 0
         provider = st.selectbox("LLM provider", providers, index=default_idx)
-        realtime = st.checkbox(
-            "Real-time NSE prices (beta)",
-            value=settings.default_price_source == "nse",
-            help="Overlay a live NSE quote on yfinance history. Best from an India IP; "
-                 "silently falls back to yfinance if NSE is unreachable.",
-        )
-    price_source = "nse" if realtime else "yfinance"
+        st.caption("Price source: yfinance (free delayed/EOD baseline)")
 
     if mode == "Screener":
-        _screener_view(settings, provider, price_source)
+        _screener_view(settings, provider)
     else:
-        _single_stock_view(settings, provider, price_source)
+        _single_stock_view(settings, provider)
 
     st.sidebar.caption("Local Ollama & rule-based need no API key. Cloud providers read keys from .env.")
 

@@ -55,10 +55,12 @@ class YFinanceSource:
             raise ValueError(
                 f"No price history for '{symbol}'. Check the ticker (try adding .NS or .BO)."
             )
-        # Normalize column names / drop tz for clean downstream handling.
+        # Normalize column names / drop invalid closing bars for clean downstream handling.
         df = df.rename(columns=str.title)
         keep = [c for c in ("Open", "High", "Low", "Close", "Volume") if c in df.columns]
-        df = df[keep].dropna(how="all")
+        df = df[keep].dropna(how="all").dropna(subset=["Close"])
+        if df.empty:
+            raise ValueError(f"No valid closing prices for '{symbol}'.")
         return df
 
     def fundamentals(self, symbol: str) -> Fundamentals:

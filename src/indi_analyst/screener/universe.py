@@ -1,10 +1,10 @@
 """Resolve a universe name to its constituents.
 
-Resolution chain (per the live-fetch decision, made safe with caching):
-    fresh cache  ->  live-fetch NSE CSV  ->  stale cache  ->  bundled data/nifty50.csv
+Resolution chain:
+    fresh cache  ->  stale cache  ->  bundled data/nifty50.csv
 
-Any step can fail (offline, NSE 403, unknown index) and we degrade to the next, appending a
-human-readable warning rather than raising — a scan should always get *some* list to work with.
+Any cache or bundled lookup can fail for an unknown index, and we degrade to the next available
+local source, appending a human-readable warning rather than raising.
 
 Also supports ad-hoc universes:
     watchlist:RELIANCE,TCS,INFY     inline comma-separated symbols
@@ -24,30 +24,20 @@ from indi_analyst.screener.models import Constituent
 
 INDEX_UNIVERSES = {"nifty50", "nifty200", "nifty500"}
 
-# NSE 403s bare HTTP clients; a browser-ish header set gets the archive CSVs through.
-_NSE_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
-    ),
-    "Accept": "text/csv,text/plain,*/*",
-    "Accept-Language": "en-US,en;q=0.9",
-}
 
-
-def _to_yf_symbol(nse_symbol: str) -> str:
-    s = nse_symbol.strip().upper()
+def _to_yf_symbol(symbol: str) -> str:
+    s = symbol.strip().upper()
     if s.endswith(".NS") or s.endswith(".BO"):
         return s
     return f"{s}.NS"
 
 
-def _parse_nse_csv(text: str) -> list[Constituent]:
-    """Parse an NSE index-constituents CSV (cols: Company Name, Industry, Symbol, ...)."""
+def _parse_constituent_csv(text: str) -> list[Constituent]:
+    """Parse a constituent CSV (cols: Company Name, Industry, Symbol, ...)."""
     reader = csv.DictReader(io.StringIO(text))
     members: list[Constituent] = []
     for raw in reader:
-        # Header names vary in whitespace/case across NSE files — normalize keys.
+        # Header names vary in whitespace/case across files — normalize keys.
         row = {(k or "").strip().lower(): (v or "").strip() for k, v in raw.items()}
         symbol = row.get("symbol")
         if not symbol:
@@ -62,25 +52,12 @@ def _parse_nse_csv(text: str) -> list[Constituent]:
     return members
 
 
-def fetch_nse_index(name: str, base_url: str, timeout: float = 20.0) -> list[Constituent]:
-    """Live-fetch an NSE index constituents CSV. Raises on any failure."""
-    import httpx
-
-    url = f"{base_url.rstrip('/')}/ind_{name}list.csv"
-    resp = httpx.get(url, headers=_NSE_HEADERS, timeout=timeout, follow_redirects=True)
-    resp.raise_for_status()
-    members = _parse_nse_csv(resp.text)
-    if not members:
-        raise ValueError(f"NSE CSV for '{name}' parsed to zero constituents.")
-    return members
-
-
 def _bundled_nifty50() -> list[Constituent]:
     """The always-available offline fallback shipped inside the package."""
     with resources.files("indi_analyst").joinpath("data/nifty50.csv").open(
         "r", encoding="utf-8"
     ) as fh:
-        return _parse_nse_csv(fh.read())
+        return _parse_constituent_csv(fh.read())
 
 
 def _load_from_path(path: str) -> list[Constituent]:
@@ -89,7 +66,7 @@ def _load_from_path(path: str) -> list[Constituent]:
         raise FileNotFoundError(f"Universe file not found: {p}")
     text = p.read_text(encoding="utf-8")
     if p.suffix.lower() == ".csv" and "symbol" in text.splitlines()[0].lower():
-        return _parse_nse_csv(text)
+        return _parse_constituent_csv(text)
     # Otherwise treat as a newline/comma-delimited symbol list.
     tokens = [t.strip() for line in text.splitlines() for t in line.split(",") if t.strip()]
     return [Constituent(symbol=_to_yf_symbol(t)) for t in tokens]
@@ -100,11 +77,9 @@ def load_universe(
     *,
     settings: Settings | None = None,
     cache: ScanCache | None = None,
-    force_refresh: bool = False,
-    fetcher=fetch_nse_index,
     warnings: list[str] | None = None,
 ) -> list[Constituent]:
-    """Resolve a universe name to constituents. `fetcher` is injectable for tests.
+    """Resolve a universe name to cached, bundled, inline, or local constituents.
 
     `warnings`, if given, collects human-readable notes about any degradation.
     """
@@ -128,23 +103,16 @@ def load_universe(
     cache = cache or ScanCache(settings.screener_cache_path)
     cached = cache.get_constituents(key, ttl_days=settings.universe_cache_ttl_days)
 
-    # 1) Fresh cache wins outright (unless a refresh was forced).
-    if cached and cached[1] and not force_refresh:
+    # Fresh cache wins outright.
+    if cached and cached[1]:
         return cached[0]
 
-    # 2) Try a live fetch.
-    try:
-        members = fetcher(key, settings.nse_indices_base_url)
-        cache.put_constituents(key, members)
-        return members
-    except Exception as e:  # network / 403 / parse — degrade, don't fail
-        warn.append(f"Live fetch of {key} failed ({e}); using cached/bundled constituents.")
-
-    # 3) Stale cache beats the bundled snapshot (it's still this exact index).
+    # Stale cache beats the bundled snapshot (it is still this exact index).
     if cached:
+        warn.append(f"Using stale cached constituents for {key}.")
         return cached[0]
 
-    # 4) Bundled fallback — only truly correct for nifty50, but better than nothing.
+    # Bundled fallback — only truly correct for nifty50, but better than nothing.
     if key != "nifty50":
         warn.append(f"No cached {key}; falling back to the bundled NIFTY 50 list.")
     return _bundled_nifty50()

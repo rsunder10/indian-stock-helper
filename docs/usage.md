@@ -55,26 +55,11 @@ lowercase. Prints a formatted terminal report; exits non-zero on a bad ticker or
 
 ---
 
-## Real-time NSE prices (opt-in)
+## Data-source policy
 
-By default prices come from yfinance, which lags the live NSE tape. Pass `--price-source nse` to
-overlay a **live NSE quote onto the latest bar** — so `last_close`, `change_pct`, and the
-latest-bar indicators reflect a near-live price:
-
-```bash
-uv run indi-analyst RELIANCE --price-source nse            # single-stock, live price
-uv run indi-analyst screen --universe watchlist:RELIANCE,TCS --price-source nse --provider rulebased
-```
-
-You can also make it the default without a flag: set `DEFAULT_PRICE_SOURCE=nse` in `.env` (or tick
-**Real-time NSE prices (beta)** in the dashboard sidebar).
-
-**Caveats.** NSE's endpoints are rate-limited and effectively **India-IP-only**; the history itself
-still comes from yfinance (NSE supplies only the live quote). Any NSE failure — 403, offline,
-non-India IP, market closed — **degrades silently to plain yfinance**, so output is never worse than
-the default. In screener mode a live scan **bypasses the 12-hour snapshot cache** (so it doesn't
-serve back a stale price) and hits NSE once per symbol, making it slower than a cached rule-based
-scan — use `--limit` on large universes.
+The supported baseline is free, delayed/EOD-oriented data from yfinance plus Google News RSS. It is
+appropriate for research and education, not latency-sensitive trading. Every future source adapter
+must document its coverage, delay, quota, terms, and failure behavior.
 
 ---
 
@@ -91,7 +76,7 @@ uv run indi-analyst screen --universe watchlist:RELIANCE,TCS,INFY --min-score 55
 uv run indi-analyst screen --universe nifty500 --limit 50 --action BUY,ACCUMULATE --format json
 ```
 
-**Universes** — `nifty50` / `nifty200` / `nifty500` (fetched live from NSE and cached),
+**Universes** — `nifty50` / `nifty200` / `nifty500` (using cached or bundled/local constituents),
 `watchlist:SYM1,SYM2` (inline), or `file:/path/to/list.csv` (a `Symbol`-column CSV or a
 newline/comma symbol list).
 
@@ -104,8 +89,8 @@ newline/comma symbol list).
 full verdict per stock, so start with `--limit` on the big indices. Snapshots are cached
 (`snapshot_cache_ttl_hours`), so re-scanning a universe is markedly faster the second time.
 
-**Offline** — the first scan fetches index membership from NSE and caches it; later scans work
-from that cache, and a bundled NIFTY 50 list is the last-resort fallback if NSE is unreachable.
+**Offline** — scans use cached constituents, the bundled NIFTY 50 list, an inline watchlist, or a
+local CSV. No live exchange request is needed to discover symbols.
 
 Every scan is persisted, so you can diff runs over time:
 
