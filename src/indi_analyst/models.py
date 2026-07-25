@@ -106,7 +106,9 @@ class StockSnapshot(BaseModel):
     name: str | None = None
     exchange: str | None = None  # NSE / BSE
     currency: str = "INR"
-    as_of: datetime = Field(default_factory=_utcnow)
+    as_of: datetime = Field(default_factory=_utcnow)  # when this snapshot was built
+    data_source: str | None = None  # provider that supplied the price history, e.g. "yfinance"
+    data_as_of: datetime | None = None  # timestamp of the latest price bar (data freshness)
 
     fundamentals: Fundamentals = Field(default_factory=Fundamentals)
     technicals: TechnicalSignals

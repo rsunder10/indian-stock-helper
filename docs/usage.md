@@ -116,6 +116,27 @@ The supported baseline is free, delayed/EOD-oriented data from yfinance plus Goo
 appropriate for research and education, not latency-sensitive trading. Every future source adapter
 must document its coverage, delay, quota, terms, and failure behavior.
 
+### Data quality & freshness
+
+The yfinance price path is validated at the boundary before anything reaches a recommendation. Bad
+bars are dropped rather than silently used, and each issue is reported as a note (shown under `NOTES`
+in the CLI report and as a warning in the dashboard):
+
+- non-chronological history is re-sorted,
+- bars with missing OHLC values, non-positive prices, or inconsistent High/Low (e.g. High below Low)
+  are dropped with a count,
+- a stock with no valid bars left raises rather than returning garbage.
+
+Every analysis also records its **provenance**: the CLI header prints a `Data: yfinance · as of
+<date>` line (`data_source` / `data_as_of` on the snapshot), where the date is the latest price bar —
+so you always know the source and how fresh the data is.
+
+**Rate & retry discipline** — free endpoints have no SLA, so each yfinance call is retried with
+exponential backoff on a transient failure, and calls are paced by a minimum interval (a single
+shared limiter across a screener scan's worker threads, so a scan doesn't hammer the endpoint). Tune
+via `.env`: `YF_MAX_RETRIES` (default 3), `YF_RETRY_BACKOFF` (0.5s), `YF_MIN_REQUEST_INTERVAL`
+(0.15s; set 0 to disable throttling).
+
 ---
 
 ## Screener (scan a universe)

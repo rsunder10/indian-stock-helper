@@ -14,6 +14,7 @@ from typing import Callable
 from indi_analyst.analysis.engine import analyze_snapshot
 from indi_analyst.analysis.snapshot import build_snapshot
 from indi_analyst.config import Settings, get_settings
+from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.models import Recommendation
 from indi_analyst.screener.cache import ScanCache
 from indi_analyst.screener.models import Constituent, ScanResult, ScreenRow
@@ -102,6 +103,11 @@ def scan_universe(
     """
     settings = settings or get_settings()
     resolved_provider = (provider or settings.default_llm_provider)
+
+    # Build one shared, rate-limited source so all worker threads are paced as a group
+    # (a single RateLimiter instance) instead of each thread constructing its own unthrottled one.
+    if price_source is None:
+        price_source = build_price_source(settings=settings)
 
     if cache is None and (use_cache or persist):
         cache = ScanCache(settings.screener_cache_path)

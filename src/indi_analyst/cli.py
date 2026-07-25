@@ -48,6 +48,9 @@ def render(rec: Recommendation) -> str:
         + (f"  ({_fmt_pct(t.change_pct)})" if t.change_pct is not None else "")
         + f"   Trend: {t.trend}"
     )
+    if s.data_source:
+        as_of = f" · as of {s.data_as_of:%Y-%m-%d}" if s.data_as_of else ""
+        lines.append(f"Data: {s.data_source}{as_of}")
     lines.append("")
     lines.append(f"CALL: {rec.action.value}   Conviction: {rec.conviction.value}   "
                  f"Score: {q.score:.0f}/100 (tech {q.technical_score:.0f} / fund {q.fundamental_score:.0f})")

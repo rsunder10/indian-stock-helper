@@ -30,6 +30,13 @@ def build_snapshot(
     symbol, name, exchange = price_source.resolve(query)
     df: pd.DataFrame = price_source.history(symbol, period=settings.history_period)
 
+    # Data-quality warnings + provenance ride along on df.attrs (set by the source at the
+    # network boundary). Read them here, before any slicing, since attrs isn't guaranteed to
+    # survive later pandas ops. A mock source without attrs yields empty defaults.
+    warnings.extend(df.attrs.get("warnings", []))
+    data_source = df.attrs.get("source")
+    data_as_of = df.attrs.get("as_of")
+
     if len(df) < 50:
         warnings.append(
             f"Only {len(df)} bars of history — longer-period indicators (SMA-200) may be unavailable."
@@ -56,4 +63,6 @@ def build_snapshot(
         news=news,
         news_sentiment=news_sentiment,
         warnings=warnings,
+        data_source=data_source,
+        data_as_of=data_as_of,
     )

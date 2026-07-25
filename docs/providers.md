@@ -119,6 +119,9 @@ Loaded by `config.py` via pydantic-settings; environment variables override `.en
 | `HISTORY_PERIOD` | `1y` | yfinance history window for indicators |
 | `NEWS_MAX_ITEMS` | `8` | Headlines fetched |
 | `LLM_TIMEOUT` | `90.0` | Per-request timeout (seconds) |
+| `YF_MAX_RETRIES` | `3` | Attempts per yfinance call before giving up |
+| `YF_RETRY_BACKOFF` | `0.5` | Base seconds for exponential backoff between retries |
+| `YF_MIN_REQUEST_INTERVAL` | `0.15` | Min seconds between yfinance calls (0 = no throttle) |
 
 ---
 

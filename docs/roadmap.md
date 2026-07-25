@@ -54,11 +54,14 @@ at?"** Lives in `src/indi_analyst/screener/`, layered on the engine without touc
 
 The next milestone is reliability, not lower latency.
 
-- 🔜 **Harden the yfinance path** — remove invalid trailing OHLCV rows, validate monotonic dates and
-  OHLC relationships, record the source/as-of time, and surface data-quality warnings instead of
-  allowing `NaN` prices or trade levels into a recommendation.
-- 🔜 **Free-source cache and rate discipline** — use SQLite/parquet snapshots, request throttling,
-  retries with backoff, and cache-aware scans so normal use does not hammer public endpoints.
+- ✅ **Harden the yfinance path** — `history()` now re-sorts non-chronological bars, drops rows with
+  missing OHLC / non-positive prices / inconsistent High-Low, records source + as-of provenance
+  (`data_source` / `data_as_of`), and surfaces data-quality warnings (CLI `NOTES`, dashboard
+  warnings) instead of allowing `NaN`/garbage prices into a recommendation.
+- ✅ **Free-source cache and rate discipline** — SQLite snapshot cache (Phase 1) plus a dependency-free
+  `RateLimiter` + `retry`/backoff on every yfinance call; a single shared limiter paces a scan's
+  worker threads so normal use does not hammer public endpoints. (Parquet snapshots remain an
+  optional future nicety.)
 - 🔜 **Local universe packs** — ship versioned NIFTY 50/200/500 constituent files or allow users to
   provide their own CSVs. A scan should not require a live exchange request just to discover symbols.
 - 🔜 **Optional low-volume adapter experiments** — evaluate providers with an explicit free tier,

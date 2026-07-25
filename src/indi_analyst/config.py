@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # LLM request timeout (seconds)
     llm_timeout: float = 90.0
 
+    # --- Free-source hardening (yfinance rate/retry discipline) ---
+    yf_max_retries: int = 3  # attempts per yfinance network call before giving up
+    yf_retry_backoff: float = 0.5  # base seconds for exponential backoff between retries
+    yf_min_request_interval: float = 0.15  # min seconds between yfinance calls (0 = no throttle)
+
     # --- Screener / batch-scan tunables ---
     screener_cache_path: str = "~/.cache/indi-analyst/screener.db"
     screener_max_workers: int = 8  # concurrent per-symbol scans (I/O-bound)

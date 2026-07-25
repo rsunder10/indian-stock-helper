@@ -53,14 +53,22 @@ This keeps the tool:
 Free sources, behind protocols so they're swappable and testable.
 
 - **`yfinance_source.py`** — resolves a query to an NSE/BSE symbol (bare `RELIANCE` → tries
-  `RELIANCE.NS` then `.BO`), fetches OHLCV history and fundamentals from Yahoo Finance.
+  `RELIANCE.NS` then `.BO`), fetches OHLCV history and fundamentals from Yahoo Finance. Every
+  network call is paced by a `RateLimiter` and wrapped in `retry` (transient blips get backed-off
+  retries). `history()` **validates at the boundary** — re-sorts non-chronological bars, drops rows
+  with missing OHLC / non-positive prices / inconsistent High-Low — and rides the results out on
+  `df.attrs`: `source`, `as_of` (latest bar timestamp), and `warnings` (what was dropped/repaired).
+- **`throttle.py`** — dependency-free `RateLimiter` (thread-safe minimum-interval gate; one shared
+  instance paces a screener scan's worker threads as a group) and a `retry(fn, retries, backoff)`
+  helper. No `tenacity`/`backoff` dependency.
 - **`news.py`** — Google News RSS headlines, scored with VADER sentiment.
 - **`base.py`** — `PriceSource`, `FundamentalsSource`, `NewsSource` `Protocol`s. Depending on
   the *shape* (not the concrete class) is what lets tests inject a mock source with zero network,
-  and lets future free sources drop in without touching the engine.
-- **`factory.py`** — `build_price_source(settings)` constructs the supported free source. The
-  source boundary remains intentionally swappable for future free/local adapters, while the
-  yfinance path is the supported baseline.
+  and lets future free sources drop in without touching the engine. `history()` returns a bare
+  `pd.DataFrame`; data-quality metadata travels on `df.attrs` so the protocol stays unchanged.
+- **`factory.py`** — `build_price_source(settings)` constructs the supported free source, wiring in
+  the rate limiter and retry knobs from `Settings`. The source boundary remains intentionally
+  swappable for future free/local adapters, while the yfinance path is the supported baseline.
 
 ### 2. Indicators — `src/indi_analyst/indicators/technical.py`
 
@@ -73,7 +81,8 @@ breakage on Python 3.13 and keeps the math auditable. See
 ### 3. Analysis — `src/indi_analyst/analysis/`
 
 - **`snapshot.py`** — orchestrates fetch + compute into a `StockSnapshot` (sources are
-  injectable for testing).
+  injectable for testing). Reads the price source's `df.attrs` right after fetch to merge
+  data-quality warnings and record `data_source` / `data_as_of` provenance on the snapshot.
 - **`levels.py`** — deterministic **entry zone**, **ATR-based stop-loss** (widened to structural
   support, never tightened below the ATR floor), and **risk-reward targets** snapped to distinct
   resistances.
@@ -120,7 +129,7 @@ breakage on Python 3.13 and keeps the math auditable. See
 | `Fundamentals` | P/E, P/B, ROE, D/E, margins, growth, sector… (all optional — free data is patchy) |
 | `TechnicalSignals` | Latest-bar indicators + trend/level context |
 | `NewsItem` | Headline + VADER sentiment |
-| `StockSnapshot` | **The deterministic source of truth** — everything above, plus warnings |
+| `StockSnapshot` | **The deterministic source of truth** — everything above, plus warnings and `data_source` / `data_as_of` provenance |
 | `TradeLevels` | Entry band, stop, T1/T2, risk-reward |
 | `Valuation` | Blended fair value, low/high range, margin of safety, rating + per-method breakdown |
 | `QuantScore` | Action, conviction, 0–100 score + component scores + reasons |
