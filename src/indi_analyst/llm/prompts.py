@@ -8,15 +8,18 @@ from __future__ import annotations
 
 import json
 
-from indi_analyst.models import QuantScore, StockSnapshot, TradeLevels
+from indi_analyst.models import QuantScore, StockSnapshot, TradeLevels, Valuation
 
 SYSTEM_PROMPT = """You are a lead investment-banking equity analyst covering Indian (NSE/BSE) markets.
 You are given a DETERMINISTIC data snapshot for one stock: technical indicators, fundamentals,
-recent news sentiment, a rule-based quant score, and pre-computed trade levels (entry, stop, targets).
+recent news sentiment, a rule-based quant score, a fair-value estimate, and pre-computed trade
+levels (entry, stop, targets).
 
 Your job is to deliver a sharp, facts-based verdict a portfolio manager can act on:
 - State the investment thesis as concrete, evidence-backed bullets (cite the numbers in the snapshot).
 - Judge whether you AGREE with the quant action; if not, say what you'd do instead and why.
+- Weigh the fair value: is the stock trading at a discount or premium to its intrinsic value, and
+  does the margin of safety support the call?
 - List the key risks and the catalysts that could move the stock.
 - Write a one-paragraph plain-English gist.
 
@@ -37,7 +40,12 @@ Respond with ONLY a JSON object matching this schema (no markdown, no prose outs
 }"""
 
 
-def serialize(snapshot: StockSnapshot, levels: TradeLevels, quant: QuantScore) -> str:
+def serialize(
+    snapshot: StockSnapshot,
+    levels: TradeLevels,
+    quant: QuantScore,
+    valuation: Valuation | None = None,
+) -> str:
     """Build the user-message payload describing the stock."""
     t = snapshot.technicals
     f = snapshot.fundamentals
@@ -105,6 +113,15 @@ def serialize(snapshot: StockSnapshot, levels: TradeLevels, quant: QuantScore) -
         },
         "data_warnings": snapshot.warnings,
     }
+    if valuation is not None and valuation.fair_value is not None:
+        payload["fair_value"] = {
+            "fair_value": valuation.fair_value,
+            "range": [valuation.low, valuation.high],
+            "margin_of_safety": valuation.margin_of_safety,
+            "rating": valuation.rating,
+            "confidence": valuation.confidence.value if valuation.confidence else None,
+            "methods": [m.detail for m in valuation.methods],
+        }
     return (
         "Analyze this stock and return your verdict as JSON.\n\n"
         + json.dumps(payload, indent=2, default=str)

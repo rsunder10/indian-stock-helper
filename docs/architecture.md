@@ -79,13 +79,18 @@ breakage on Python 3.13 and keeps the math auditable. See
   resistances.
 - **`scoring.py`** — a transparent composite: **60% technical + 40% fundamental** → an `Action`
   (BUY/ACCUMULATE/HOLD/AVOID/SELL) and a conviction, with a `reasons` list.
+- **`valuation.py`** — deterministic **fair value (intrinsic value)**: blends whichever of the
+  Graham number, growth-justified fair-P/E (earnings power), and Gordon dividend-discount methods
+  the free data supports into a single estimate, a low/high range, a margin of safety, and an
+  under/fairly/over-valued rating. Each method keeps an explainable `detail`; missing data degrades
+  to an empty `Valuation` rather than an error.
 - **`engine.py`** — the top-level entry point: `analyze(query, provider=...)` runs the whole
   pipeline and returns a `Recommendation`. Also `analyze_snapshot(...)` if you already have one.
 
 ### 4. LLM layer — `src/indi_analyst/llm/`
 
 - **`base.py`** — the whole contract is one method:
-  `verdict(snapshot, levels, quant) -> AnalystVerdict`.
+  `verdict(snapshot, levels, quant, valuation) -> AnalystVerdict`.
 - **`prompts.py`** — the "lead investment-banker" system prompt + a deterministic JSON
   serialization of the snapshot (stable ordering → cloud prompt-caching stays effective; compact
   → small local models keep it in context).
@@ -114,6 +119,7 @@ breakage on Python 3.13 and keeps the math auditable. See
 | `NewsItem` | Headline + VADER sentiment |
 | `StockSnapshot` | **The deterministic source of truth** — everything above, plus warnings |
 | `TradeLevels` | Entry band, stop, T1/T2, risk-reward |
+| `Valuation` | Blended fair value, low/high range, margin of safety, rating + per-method breakdown |
 | `QuantScore` | Action, conviction, 0–100 score + component scores + reasons |
 | `AnalystVerdict` | The LLM's structured output: thesis, risks, catalysts, summary |
 | `Recommendation` | Final merged object the UI renders |

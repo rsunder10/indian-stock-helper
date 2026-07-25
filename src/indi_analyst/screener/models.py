@@ -46,6 +46,9 @@ class ScreenRow(BaseModel):
     change_pct: float | None = None
     pe_ratio: float | None = None
 
+    fair_value: float | None = None
+    margin_of_safety: float | None = None  # (fair - price)/price; positive == undervalued
+
     risk_reward: float | None = None
     entry_low: float | None = None
     entry_high: float | None = None
@@ -99,6 +102,7 @@ class ScreenFilter(BaseModel):
     min_score: float | None = None
     max_pe: float | None = None
     min_rr: float | None = None
+    min_upside: float | None = None  # min margin of safety vs fair value (fraction)
     trend: str | None = None  # e.g. "uptrend"
 
     def matches(self, row: ScreenRow) -> bool:
@@ -122,6 +126,10 @@ class ScreenFilter(BaseModel):
                 return False
         if self.min_rr is not None and (row.risk_reward is None or row.risk_reward < self.min_rr):
             return False
+        if self.min_upside is not None:
+            # No fair value (missing fundamentals) fails an upside floor.
+            if row.margin_of_safety is None or row.margin_of_safety < self.min_upside:
+                return False
         if self.trend is not None and (row.trend or "").lower() != self.trend.lower():
             return False
         return True

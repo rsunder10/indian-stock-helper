@@ -31,6 +31,7 @@ def _fmt_pct(x: float) -> str:
 
 def render(rec: Recommendation) -> str:
     s, t, lv, v, q = rec.snapshot, rec.snapshot.technicals, rec.levels, rec.verdict, rec.quant
+    val = rec.valuation
     lines: list[str] = []
     title = f"{s.name or s.symbol} ({s.symbol}, {s.exchange})"
     lines.append("=" * 68)
@@ -52,6 +53,19 @@ def render(rec: Recommendation) -> str:
     lines.append(f"  T1    : ₹{lv.target_1:,.2f}  ({_fmt_pct(lv.target_1_pct)})")
     lines.append(f"  T2    : ₹{lv.target_2:,.2f}  ({_fmt_pct(lv.target_2_pct)})")
     lines.append(f"  R:R   : {lv.risk_reward:.2f} : 1")
+    if val.fair_value is not None:
+        lines.append("")
+        lines.append("FAIR VALUE")
+        conf = f" · {val.confidence.value} confidence" if val.confidence else ""
+        lines.append(
+            f"  Estimate : ₹{val.fair_value:,.2f}  (range ₹{val.low:,.0f}–₹{val.high:,.0f})"
+        )
+        if val.margin_of_safety is not None:
+            lines.append(
+                f"  Vs price : {_fmt_pct(val.margin_of_safety)} — {val.rating}{conf}"
+            )
+        for m in val.methods:
+            lines.append(f"    · {m.detail}")
     lines.append("")
     lines.append("THESIS")
     for b in v.thesis:
@@ -84,15 +98,18 @@ def render_scan(result: ScanResult, rows: list, top: int | None) -> str:
     """A compact ranked table of scan rows (already filtered/ranked by the caller)."""
     shown = rows[:top] if top else rows
     lines: list[str] = []
-    lines.append("=" * 78)
+    lines.append("=" * 88)
     lines.append(
         f"SCREEN: {result.universe}   provider: {result.provider}   "
         f"scanned {result.ok_count} ok / {result.error_count} err   showing {len(shown)}"
     )
-    lines.append("=" * 78)
-    header = f"{'#':>2}  {'SYMBOL':<14}{'ACTION':<11}{'CONV':<7}{'SCORE':>6}{'CLOSE':>11}{'R:R':>6}  SECTOR"
+    lines.append("=" * 88)
+    header = (
+        f"{'#':>2}  {'SYMBOL':<14}{'ACTION':<11}{'CONV':<7}{'SCORE':>6}"
+        f"{'CLOSE':>11}{'R:R':>6}{'UPSIDE':>8}  SECTOR"
+    )
     lines.append(header)
-    lines.append("-" * 78)
+    lines.append("-" * 88)
     for i, r in enumerate(shown, 1):
         lines.append(
             f"{i:>2}  {r.symbol:<14}"
@@ -101,6 +118,7 @@ def render_scan(result: ScanResult, rows: list, top: int | None) -> str:
             f"{(f'{r.score:.0f}' if r.score is not None else '—'):>6}"
             f"{(f'₹{r.last_close:,.0f}' if r.last_close is not None else '—'):>11}"
             f"{(f'{r.risk_reward:.1f}' if r.risk_reward is not None else '—'):>6}"
+            f"{(_fmt_pct(r.margin_of_safety) if r.margin_of_safety is not None else '—'):>8}"
             f"  {(r.sector or '')[:26]}"
         )
     if not shown:
@@ -120,6 +138,8 @@ def _build_filter(args) -> ScreenFilter | None:
         data["min_rr"] = args.min_rr
     if args.max_pe is not None:
         data["max_pe"] = args.max_pe
+    if args.min_upside is not None:
+        data["min_upside"] = args.min_upside
     if args.action:
         data["actions"] = {Action(a.strip().upper()) for a in args.action.split(",")}
     if args.sector:
@@ -211,6 +231,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_sc.add_argument("--min-score", type=float, default=None)
     p_sc.add_argument("--min-rr", type=float, default=None, help="Minimum risk:reward.")
     p_sc.add_argument("--max-pe", type=float, default=None)
+    p_sc.add_argument("--min-upside", type=float, default=None,
+                      help="Minimum margin of safety vs fair value, e.g. 0.15 for +15%%.")
     p_sc.add_argument("--action", default=None, help="Comma list, e.g. BUY,ACCUMULATE.")
     p_sc.add_argument("--sector", default=None, help="Comma list of sector substrings.")
     p_sc.add_argument("--digest", action="store_true", help="Append a top-ideas digest.")

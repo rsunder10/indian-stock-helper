@@ -12,6 +12,7 @@ from indi_analyst.models import (
     QuantScore,
     StockSnapshot,
     TradeLevels,
+    Valuation,
 )
 
 _ACTION_GIST = {
@@ -27,13 +28,24 @@ class RuleBasedProvider:
     name = "rulebased"
 
     def verdict(
-        self, snapshot: StockSnapshot, levels: TradeLevels, quant: QuantScore
+        self,
+        snapshot: StockSnapshot,
+        levels: TradeLevels,
+        quant: QuantScore,
+        valuation: Valuation | None = None,
     ) -> AnalystVerdict:
         t = snapshot.technicals
         f = snapshot.fundamentals
 
         # Thesis: promote the strongest scoring reasons to the top.
         thesis = list(quant.reasons[:5])
+
+        # Fold the fair-value read into the thesis when we have one.
+        if valuation is not None and valuation.fair_value is not None and valuation.margin_of_safety is not None:
+            thesis.append(
+                f"Fair value ≈ ₹{valuation.fair_value:,.0f} "
+                f"({valuation.margin_of_safety * 100:+.0f}% vs price) — {valuation.rating}."
+            )
 
         risks: list[str] = []
         if t.rsi_14 is not None and t.rsi_14 > 70:
@@ -48,6 +60,11 @@ class RuleBasedProvider:
             risks.append("Sparse fundamentals from the free source — thesis leans technical.")
         if snapshot.news_sentiment is not None and snapshot.news_sentiment < -0.2:
             risks.append("Negative recent news flow.")
+        if valuation is not None and valuation.rating == "Overvalued" and valuation.margin_of_safety is not None:
+            risks.append(
+                f"Trades ~{-valuation.margin_of_safety * 100:.0f}% above estimated fair value — "
+                "limited margin of safety."
+            )
         if not risks:
             risks.append("Standard market and execution risk; levels can be invalidated by news.")
 

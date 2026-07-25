@@ -109,12 +109,21 @@ def _recommendation_card(rec: Recommendation) -> None:
         unsafe_allow_html=True,
     )
     lv = rec.levels
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Entry zone", f"₹{lv.entry_low:,.0f}–{lv.entry_high:,.0f}")
     c2.metric("Stop loss", f"₹{lv.stop_loss:,.0f}", f"{lv.stop_loss_pct * 100:+.1f}%")
     c3.metric("Target 1 / 2", f"₹{lv.target_1:,.0f} / {lv.target_2:,.0f}",
               f"{lv.target_1_pct * 100:+.1f}% / {lv.target_2_pct * 100:+.1f}%")
     c4.metric("Risk : Reward", f"{lv.risk_reward:.2f} : 1")
+    val = rec.valuation
+    if val.fair_value is not None:
+        delta = (
+            f"{val.margin_of_safety * 100:+.1f}% · {val.rating}"
+            if val.margin_of_safety is not None else val.rating
+        )
+        c5.metric("Fair value", f"₹{val.fair_value:,.0f}", delta, delta_color="normal")
+    else:
+        c5.metric("Fair value", "—")
 
 
 def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
@@ -150,6 +159,23 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
         st.markdown("**Catalysts**")
         for c in rec.verdict.catalysts:
             st.markdown(f"- {c}")
+
+    val = rec.valuation
+    if val.fair_value is not None:
+        conf = f" · {val.confidence.value} confidence" if val.confidence else ""
+        with st.expander(f"Fair value — ₹{val.fair_value:,.0f} ({val.rating}{conf})"):
+            st.caption(
+                f"Range ₹{val.low:,.0f}–₹{val.high:,.0f}"
+                + (f"  ·  margin of safety {val.margin_of_safety * 100:+.1f}%"
+                   if val.margin_of_safety is not None else "")
+            )
+            st.table(
+                {"Method": [m.name for m in val.methods],
+                 "Fair value (₹)": [f"{m.fair_value:,.0f}" for m in val.methods],
+                 "How": [m.detail for m in val.methods]}
+            )
+            for reason in val.reasons:
+                st.caption(f"• {reason}")
 
     with st.expander("Fundamentals"):
         f = s.fundamentals
@@ -202,6 +228,8 @@ def _screener_view(settings, provider: str) -> None:
                           help="Caps the scan for speed. Rule-based provider is fastest.")
         preset = st.selectbox("Preset", ["(none)", *PRESETS.keys()], index=0)
         min_score = st.slider("Min score", 0, 100, 0, step=5)
+        min_upside = st.slider("Min upside (fair value)", -50, 50, -50, step=5,
+                               help="Margin of safety vs fair value, %. -50 = no filter.")
         scan_btn = st.button("Run scan", type="primary", width="stretch")
 
     if scan_btn:
@@ -217,6 +245,8 @@ def _screener_view(settings, provider: str) -> None:
     flt = ScreenFilter(**PRESETS[preset].model_dump()) if preset != "(none)" else ScreenFilter()
     if min_score:
         flt = ScreenFilter(**{**flt.model_dump(), "min_score": float(min_score)})
+    if min_upside > -50:
+        flt = ScreenFilter(**{**flt.model_dump(), "min_upside": min_upside / 100})
     active = flt if flt.model_dump(exclude_none=True) else None
     rows = rank(apply(result.rows, active), by="score")
 
@@ -238,6 +268,8 @@ def _screener_view(settings, provider: str) -> None:
             "Tech": r.technical_score,
             "Fund": r.fundamental_score,
             "Close": r.last_close,
+            "Fair value": r.fair_value,
+            "Upside": r.margin_of_safety,
             "R:R": r.risk_reward,
             "Sector": r.sector,
         }

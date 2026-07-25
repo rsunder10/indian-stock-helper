@@ -37,6 +37,8 @@ def _row_from_recommendation(c: Constituent, rec: Recommendation) -> ScreenRow:
         last_close=t.last_close,
         change_pct=t.change_pct,
         pe_ratio=rec.snapshot.fundamentals.pe_ratio,
+        fair_value=rec.valuation.fair_value,
+        margin_of_safety=rec.valuation.margin_of_safety,
         risk_reward=lv.risk_reward,
         entry_low=lv.entry_low,
         entry_high=lv.entry_high,

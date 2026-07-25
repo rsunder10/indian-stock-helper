@@ -135,6 +135,33 @@ class TradeLevels(BaseModel):
         return (self.entry_low + self.entry_high) / 2
 
 
+class ValuationMethod(BaseModel):
+    """One intrinsic-value estimate, kept explainable via its `detail` string."""
+
+    name: str  # e.g. "Graham number", "Earnings power", "Dividend discount"
+    fair_value: float
+    weight: float  # contribution to the blend (normalized across active methods)
+    detail: str  # human-readable how-it-was-derived line
+
+
+class Valuation(BaseModel):
+    """Deterministic intrinsic-value estimate, computed before any LLM sees the snapshot.
+
+    Blends whichever free-data methods can run. All fields optional — free sources are
+    patchy, so a stock with no usable fundamentals yields an empty Valuation (with a reason),
+    never an error.
+    """
+
+    fair_value: float | None = None  # blended intrinsic value per share
+    low: float | None = None  # most conservative method estimate
+    high: float | None = None  # most optimistic method estimate
+    margin_of_safety: float | None = None  # (fair - price)/price; positive == undervalued
+    rating: str | None = None  # "Undervalued" | "Fairly valued" | "Overvalued"
+    confidence: Conviction | None = None  # HIGH >=3 methods, MEDIUM 2, LOW 1
+    methods: list[ValuationMethod] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)  # notes, incl. why a method was skipped
+
+
 class QuantScore(BaseModel):
     """Composite deterministic score and its component breakdown."""
 
@@ -168,6 +195,7 @@ class Recommendation(BaseModel):
     snapshot: StockSnapshot
     levels: TradeLevels
     quant: QuantScore
+    valuation: Valuation = Field(default_factory=Valuation)
     verdict: AnalystVerdict
     action: Action  # final resolved action
     conviction: Conviction

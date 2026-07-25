@@ -5,6 +5,7 @@ from __future__ import annotations
 from indi_analyst.analysis.levels import compute_levels
 from indi_analyst.analysis.scoring import score as quant_score
 from indi_analyst.analysis.snapshot import build_snapshot
+from indi_analyst.analysis.valuation import compute_valuation
 from indi_analyst.config import Settings, get_settings
 from indi_analyst.llm.base import LLMProvider, ProviderError
 from indi_analyst.llm.factory import build_provider_with_fallback
@@ -40,12 +41,13 @@ def analyze_snapshot(
 
     levels = compute_levels(snapshot, settings)
     quant = quant_score(snapshot)
+    valuation = compute_valuation(snapshot, settings)
 
     llm, note = build_provider_with_fallback(provider, settings)
     if note:
         snapshot.warnings.append(note)
 
-    verdict = _run_verdict(llm, snapshot, levels, quant)
+    verdict = _run_verdict(llm, snapshot, levels, quant, valuation)
 
     # Resolve the final action: honor an analyst override only when it disagrees explicitly.
     final_action = quant.action
@@ -56,6 +58,7 @@ def analyze_snapshot(
         snapshot=snapshot,
         levels=levels,
         quant=quant,
+        valuation=valuation,
         verdict=verdict,
         action=final_action,
         conviction=verdict.conviction,
@@ -63,12 +66,12 @@ def analyze_snapshot(
     )
 
 
-def _run_verdict(llm: LLMProvider, snapshot, levels, quant):
+def _run_verdict(llm: LLMProvider, snapshot, levels, quant, valuation):
     """Call the provider; if it fails at request time, degrade to rule-based."""
     try:
-        return llm.verdict(snapshot, levels, quant)
+        return llm.verdict(snapshot, levels, quant, valuation)
     except ProviderError as e:
         if not isinstance(llm, RuleBasedProvider):
             snapshot.warnings.append(f"{getattr(llm, 'name', 'provider')} failed ({e}); used rule-based verdict.")
-            return RuleBasedProvider().verdict(snapshot, levels, quant)
+            return RuleBasedProvider().verdict(snapshot, levels, quant, valuation)
         raise

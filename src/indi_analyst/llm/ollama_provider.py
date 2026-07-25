@@ -8,7 +8,13 @@ from indi_analyst.config import Settings
 from indi_analyst.llm.base import ProviderError
 from indi_analyst.llm.parsing import parse_verdict
 from indi_analyst.llm.prompts import SYSTEM_PROMPT, serialize
-from indi_analyst.models import AnalystVerdict, QuantScore, StockSnapshot, TradeLevels
+from indi_analyst.models import (
+    AnalystVerdict,
+    QuantScore,
+    StockSnapshot,
+    TradeLevels,
+    Valuation,
+)
 
 
 class OllamaProvider:
@@ -20,7 +26,11 @@ class OllamaProvider:
         self.timeout = settings.llm_timeout
 
     def verdict(
-        self, snapshot: StockSnapshot, levels: TradeLevels, quant: QuantScore
+        self,
+        snapshot: StockSnapshot,
+        levels: TradeLevels,
+        quant: QuantScore,
+        valuation: Valuation,
     ) -> AnalystVerdict:
         payload = {
             "model": self.model,
@@ -29,7 +39,7 @@ class OllamaProvider:
             "options": {"temperature": 0.3},
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": serialize(snapshot, levels, quant)},
+                {"role": "user", "content": serialize(snapshot, levels, quant, valuation)},
             ],
         }
         try:

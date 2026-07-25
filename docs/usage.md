@@ -55,6 +55,36 @@ lowercase. Prints a formatted terminal report; exits non-zero on a bad ticker or
 
 ---
 
+## Fair value (intrinsic value)
+
+Alongside the trade levels, every analysis computes a deterministic **fair value** — what the
+business looks worth, independent of where it's trading — and reports it under a `FAIR VALUE`
+block:
+
+```
+FAIR VALUE
+  Estimate : ₹1,650.00  (range ₹1,480–₹1,910)
+  Vs price : +11.2% — Undervalued · HIGH confidence
+    · √(22.5 × EPS ₹78.0 × BVPS ₹41.0) = ₹1,690
+    · Fair P/E 18 (growth 18%) × EPS ₹78.0 = ₹1,404
+    · Gordon: D ₹18.0 × (1+5%) / (12% − 5%) = ₹270
+```
+
+It blends whichever of three transparent methods the free data supports — the **Graham number**,
+a growth-justified **fair P/E × EPS** (earnings power), and the **Gordon dividend-discount model**
+(dividend payers only) — into one estimate plus a low/high range. **Margin of safety** is
+`(fair − price)/price`; the **rating** (Undervalued / Fairly valued / Overvalued) flips at the
+`MARGIN_OF_SAFETY` band; **confidence** reflects how many methods contributed (3 → HIGH). When the
+free source has no usable P/E, P/B, or dividend, the block is simply omitted rather than guessed.
+
+Tune the model via `.env` — `FAIR_VALUE_DISCOUNT_RATE`, `FAIR_VALUE_TERMINAL_GROWTH`,
+`FAIR_PE_BASE` / `FAIR_PE_FLOOR` / `FAIR_PE_CAP`, and `MARGIN_OF_SAFETY` (see `.env.example`).
+
+In the screener, fair value surfaces as an **UPSIDE** column and a `--min-upside` filter (e.g.
+`--min-upside 0.15` keeps only names trading ≥15% below fair value).
+
+---
+
 ## Data-source policy
 
 The supported baseline is free, delayed/EOD-oriented data from yfinance plus Google News RSS. It is
@@ -82,8 +112,9 @@ newline/comma symbol list).
 
 **Filters** — `--preset` (`high-conviction-buys`, `oversold-quality`,
 `breakout-with-fundamentals`), then narrow further with `--min-score`, `--min-rr`, `--max-pe`,
-`--action BUY,ACCUMULATE`, `--sector "Information Technology,Energy"`. `--top N` limits rows shown
-(`--top 0` = all); `--limit N` caps how many constituents get scanned.
+`--min-upside` (min margin of safety vs fair value), `--action BUY,ACCUMULATE`,
+`--sector "Information Technology,Energy"`. `--top N` limits rows shown (`--top 0` = all);
+`--limit N` caps how many constituents get scanned.
 
 **Speed & cost** — rule-based is fastest/free and needs no key; a cloud/Ollama provider runs a
 full verdict per stock, so start with `--limit` on the big indices. Snapshots are cached

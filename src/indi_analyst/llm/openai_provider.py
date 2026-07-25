@@ -9,7 +9,13 @@ from indi_analyst.config import Settings
 from indi_analyst.llm.base import ProviderError
 from indi_analyst.llm.parsing import parse_verdict
 from indi_analyst.llm.prompts import SYSTEM_PROMPT, serialize
-from indi_analyst.models import AnalystVerdict, QuantScore, StockSnapshot, TradeLevels
+from indi_analyst.models import (
+    AnalystVerdict,
+    QuantScore,
+    StockSnapshot,
+    TradeLevels,
+    Valuation,
+)
 
 
 class OpenAIProvider:
@@ -33,7 +39,11 @@ class OpenAIProvider:
         self.model = settings.openai_model
 
     def verdict(
-        self, snapshot: StockSnapshot, levels: TradeLevels, quant: QuantScore
+        self,
+        snapshot: StockSnapshot,
+        levels: TradeLevels,
+        quant: QuantScore,
+        valuation: Valuation,
     ) -> AnalystVerdict:
         try:
             resp = self.client.chat.completions.create(
@@ -42,7 +52,7 @@ class OpenAIProvider:
                 response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": serialize(snapshot, levels, quant)},
+                    {"role": "user", "content": serialize(snapshot, levels, quant, valuation)},
                 ],
             )
         except self._openai.OpenAIError as e:

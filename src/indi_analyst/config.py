@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     history_period: str = "1y"  # yfinance period for indicator computation
     news_max_items: int = 8
 
+    # --- Fair-value (intrinsic value) tunables ---
+    fair_value_discount_rate: float = 0.12  # cost of equity `r` for the Gordon DDM
+    fair_value_terminal_growth: float = 0.05  # cap on dividend growth `g` (must stay < r)
+    fair_pe_base: float = 15.0  # fair P/E used when growth is unknown
+    fair_pe_floor: float = 10.0  # lowest justified P/E
+    fair_pe_cap: float = 35.0  # highest justified P/E (avoids paying any multiple)
+    margin_of_safety: float = 0.15  # +/- band that flips under/fairly/over-valued
+
     # LLM request timeout (seconds)
     llm_timeout: float = 90.0
 

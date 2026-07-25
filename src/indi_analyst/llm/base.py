@@ -4,16 +4,26 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from indi_analyst.models import AnalystVerdict, QuantScore, StockSnapshot, TradeLevels
+from indi_analyst.models import (
+    AnalystVerdict,
+    QuantScore,
+    StockSnapshot,
+    TradeLevels,
+    Valuation,
+)
 
 
 class LLMProvider(Protocol):
     name: str
 
     def verdict(
-        self, snapshot: StockSnapshot, levels: TradeLevels, quant: QuantScore
+        self,
+        snapshot: StockSnapshot,
+        levels: TradeLevels,
+        quant: QuantScore,
+        valuation: Valuation,
     ) -> AnalystVerdict:
-        """Turn a deterministic snapshot + levels + quant score into an analyst verdict."""
+        """Turn a deterministic snapshot + levels + quant + valuation into an analyst verdict."""
         ...
 
 
