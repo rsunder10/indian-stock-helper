@@ -89,7 +89,10 @@ FAIR VALUE
 
 It blends whichever of three transparent methods the free data supports — the **Graham number**,
 a growth-justified **fair P/E × EPS** (earnings power), and the **Gordon dividend-discount model**
-(dividend payers only) — into one estimate plus a low/high range. **Margin of safety** is
+(dividend payers only) — into one estimate plus a low/high range. EPS and book value per share use
+the source's **reported per-share figures** when available (yfinance `trailingEps` / `bookValue`),
+falling back to backing them out of the P/E and P/B ratios (`eps = price / pe`, `bvps = price / pb`)
+otherwise. **Margin of safety** is
 `(fair − price)/price`; the **rating** (Undervalued / Fairly valued / Overvalued) flips at the
 `MARGIN_OF_SAFETY` band; **confidence** reflects how many methods contributed (3 → HIGH). When the
 free source has no usable P/E, P/B, or dividend, the block is simply omitted rather than guessed.
@@ -152,9 +155,18 @@ uv run indi-analyst screen --universe watchlist:RELIANCE,TCS,INFY --min-score 55
 uv run indi-analyst screen --universe nifty500 --limit 50 --action BUY,ACCUMULATE --format json
 ```
 
-**Universes** — `nifty50` / `nifty200` / `nifty500` (using cached or bundled/local constituents),
+**Universes** — `nifty50` / `nifty200` / `nifty500` (each ships as a versioned constituent pack
+under `src/indi_analyst/data/`, so a scan needs **no live exchange request** to discover symbols),
 `watchlist:SYM1,SYM2` (inline), or `file:/path/to/list.csv` (a `Symbol`-column CSV or a
-newline/comma symbol list).
+newline/comma symbol list). Resolution order is: fresh cache → stale cache → bundled pack for that
+index → the always-present NIFTY 50 pack (with a warning) if no pack ships for the requested index.
+
+Refresh the bundled packs from the free, no-key NSE Indices CSVs (opt-in, never on the analysis
+path):
+
+```bash
+uv run python scripts/refresh_universes.py
+```
 
 **Filters** — `--preset` (`high-conviction-buys`, `oversold-quality`,
 `breakout-with-fundamentals`), then narrow further with `--min-score`, `--min-rr`, `--max-pe`,

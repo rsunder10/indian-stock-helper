@@ -39,6 +39,7 @@ class Fundamentals(BaseModel):
     pe_ratio: float | None = None
     forward_pe: float | None = None
     pb_ratio: float | None = None
+    price_to_sales: float | None = None  # trailing P/S
     roe: float | None = None  # return on equity, fraction (0.18 == 18%)
     debt_to_equity: float | None = None
     profit_margin: float | None = None  # fraction
@@ -46,6 +47,13 @@ class Fundamentals(BaseModel):
     earnings_growth: float | None = None  # yoy, fraction
     dividend_yield: float | None = None  # fraction
     beta: float | None = None
+    # Per-share absolutes (direct from the source when available; valuation prefers these over
+    # backing them out of P/E and P/B ratios).
+    eps: float | None = None  # trailing earnings per share, currency units
+    book_value: float | None = None  # book value per share
+    dividend_rate: float | None = None  # trailing annual dividend per share
+    revenue_per_share: float | None = None
+    next_earnings_date: datetime | None = None  # next scheduled results date, if known
     sector: str | None = None
     industry: str | None = None
 

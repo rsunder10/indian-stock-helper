@@ -35,6 +35,24 @@ def _plain(text: str) -> str:
     return text.replace("**", "")
 
 
+def _fundamentals_line(f) -> str:
+    """One compact line of the fundamentals that are present. Empty string if none are."""
+    parts: list[str] = []
+    if f.pe_ratio is not None:
+        parts.append(f"P/E {f.pe_ratio:.1f}")
+    if f.eps is not None:
+        parts.append(f"EPS ₹{f.eps:,.1f}")
+    if f.book_value is not None:
+        parts.append(f"BVPS ₹{f.book_value:,.1f}")
+    if f.roe is not None:
+        parts.append(f"ROE {f.roe * 100:.0f}%")
+    if f.dividend_yield is not None:
+        parts.append(f"Div yld {f.dividend_yield * 100:.1f}%")
+    if f.debt_to_equity is not None:
+        parts.append(f"D/E {f.debt_to_equity:.2f}")
+    return "   ".join(parts)
+
+
 def render(rec: Recommendation) -> str:
     s, t, lv, v, q = rec.snapshot, rec.snapshot.technicals, rec.levels, rec.verdict, rec.quant
     val = rec.valuation
@@ -89,6 +107,13 @@ def render(rec: Recommendation) -> str:
             lines.append("  The maths:")
         for m in val.methods:
             lines.append(f"    · {m.detail}")
+    fund_line = _fundamentals_line(s.fundamentals)
+    if fund_line:
+        lines.append("")
+        lines.append("FUNDAMENTALS")
+        lines.append(f"  {fund_line}")
+        if s.fundamentals.next_earnings_date is not None:
+            lines.append(f"  Next results: {s.fundamentals.next_earnings_date:%Y-%m-%d}")
     lines.append("")
     lines.append("THESIS")
     for b in v.thesis:

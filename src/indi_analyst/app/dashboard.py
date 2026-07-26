@@ -196,9 +196,12 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
         f = s.fundamentals
         rows = {
             "Market cap": f.market_cap, "P/E": f.pe_ratio, "Forward P/E": f.forward_pe,
-            "P/B": f.pb_ratio, "ROE": f.roe, "Debt/Equity": f.debt_to_equity,
+            "P/B": f.pb_ratio, "P/S": f.price_to_sales, "EPS": f.eps,
+            "Book value/sh": f.book_value, "ROE": f.roe, "Debt/Equity": f.debt_to_equity,
             "Profit margin": f.profit_margin, "Revenue growth": f.revenue_growth,
-            "Dividend yield": f.dividend_yield, "Sector": f.sector, "Industry": f.industry,
+            "Dividend yield": f.dividend_yield, "Dividend/sh": f.dividend_rate,
+            "Next results": (f.next_earnings_date.date().isoformat() if f.next_earnings_date else None),
+            "Sector": f.sector, "Industry": f.industry,
         }
         st.table({k: [("—" if v is None else v)] for k, v in rows.items()})
 

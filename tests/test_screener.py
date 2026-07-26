@@ -119,6 +119,48 @@ def test_load_universe_watchlist_and_unknown():
         load_universe("nifty9000")
 
 
+def test_load_universe_nifty200_uses_bundled_pack(tmp_path):
+    """nifty200 resolves to its own ~200-name pack, not the NIFTY 50 fallback."""
+    settings = _settings(tmp_path)
+    cache = ScanCache(settings.screener_cache_path)
+    warnings: list[str] = []
+    got = load_universe("nifty200", settings=settings, cache=cache, warnings=warnings)
+
+    assert len(got) >= 180
+    assert any(m.symbol == "RELIANCE.NS" for m in got)
+    # A real pack ships, so there must be no fallback-to-nifty50 warning.
+    assert not any("falling back" in w for w in warnings)
+
+
+def test_load_universe_nifty500_uses_bundled_pack(tmp_path):
+    settings = _settings(tmp_path)
+    cache = ScanCache(settings.screener_cache_path)
+    got = load_universe("nifty500", settings=settings, cache=cache)
+    assert len(got) >= 450
+
+
+def test_load_universe_falls_back_when_pack_missing(monkeypatch, tmp_path):
+    """If a recognized index has no bundled pack, degrade to nifty50 with a warning."""
+    import indi_analyst.screener.universe as u
+
+    real_bundled = u._bundled
+
+    def _no_pack(key: str):
+        # Simulate a missing pack for nifty500 only; keep nifty50 available.
+        return None if key == "nifty500" else real_bundled(key)
+
+    monkeypatch.setattr(u, "_bundled", _no_pack)
+    monkeypatch.setattr(u, "INDEX_UNIVERSES", u.INDEX_UNIVERSES | {"nifty500"})
+
+    settings = _settings(tmp_path)
+    cache = ScanCache(settings.screener_cache_path)
+    warnings: list[str] = []
+    got = load_universe("nifty500", settings=settings, cache=cache, warnings=warnings)
+
+    assert any(m.symbol == "RELIANCE.NS" for m in got)  # nifty50 contents
+    assert any("falling back to the bundled NIFTY 50 list" in w for w in warnings)
+
+
 # --- Filters + presets ------------------------------------------------------
 
 def _row(symbol, action, conv, score, rr=2.5, sector="Testing", pe=20.0):

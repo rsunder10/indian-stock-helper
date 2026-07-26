@@ -10,6 +10,8 @@ downstream into a recommendation.
 
 from __future__ import annotations
 
+from datetime import date, datetime, timezone
+
 import pandas as pd
 import yfinance as yf
 
@@ -17,6 +19,39 @@ from indi_analyst.datasources.throttle import RateLimiter, retry
 from indi_analyst.models import Fundamentals
 
 _OHLC = ["Open", "High", "Low", "Close"]
+
+
+def _earnings_date(calendar) -> datetime | None:
+    """Extract the next earnings date from yfinance's calendar (dict or DataFrame), else None.
+
+    yfinance returns either a ``dict`` (``{"Earnings Date": [date, ...], ...}``) on newer
+    versions or a DataFrame on older ones. We read the first future-facing value and coerce it
+    to a tz-aware UTC datetime, tolerating whatever shape shows up.
+    """
+    value = None
+    try:
+        if isinstance(calendar, dict):
+            value = calendar.get("Earnings Date")
+        elif isinstance(calendar, pd.DataFrame) and "Earnings Date" in calendar.index:
+            value = calendar.loc["Earnings Date"].to_list()
+    except Exception:
+        return None
+
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else None
+    if value is None:
+        return None
+
+    try:
+        if isinstance(value, datetime):
+            dt = value
+        elif isinstance(value, date):
+            dt = datetime(value.year, value.month, value.day)
+        else:
+            dt = pd.Timestamp(value).to_pydatetime()
+    except Exception:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 def _f(value) -> float | None:
@@ -141,6 +176,7 @@ class YFinanceSource:
             pe_ratio=_f(info.get("trailingPE")),
             forward_pe=_f(info.get("forwardPE")),
             pb_ratio=_f(info.get("priceToBook")),
+            price_to_sales=_f(info.get("priceToSalesTrailing12Months")),
             roe=_f(info.get("returnOnEquity")),
             debt_to_equity=_f(info.get("debtToEquity")),
             profit_margin=_f(info.get("profitMargins")),
@@ -148,9 +184,27 @@ class YFinanceSource:
             earnings_growth=_f(info.get("earningsGrowth")),
             dividend_yield=_f(info.get("dividendYield")),
             beta=_f(info.get("beta")),
+            eps=_f(info.get("trailingEps")),
+            book_value=_f(info.get("bookValue")),
+            dividend_rate=_f(info.get("dividendRate")),
+            revenue_per_share=_f(info.get("revenuePerShare")),
+            next_earnings_date=self._next_earnings_date(symbol),
             sector=info.get("sector"),
             industry=info.get("industry"),
         )
+
+    def _next_earnings_date(self, symbol: str):
+        """Best-effort next results date from Yahoo's calendar. None on any failure/absence."""
+        self._limiter.acquire()
+        try:
+            calendar = retry(
+                lambda: yf.Ticker(symbol).calendar,
+                retries=self._retries,
+                backoff=self._backoff,
+            )
+        except Exception:
+            return None
+        return _earnings_date(calendar)
 
     def _safe_info(self, symbol: str) -> dict:
         # Fundamentals are best-effort: retry a transient blip, then degrade to {} rather than raise.

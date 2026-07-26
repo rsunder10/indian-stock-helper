@@ -9,9 +9,10 @@ built from the ratios we already have:
   2. Earnings power     — a growth-justified fair P/E × EPS (Peter Lynch / PEG≈1).
   3. Dividend discount  — Gordon growth model, for dividend payers only.
 
-EPS and book value per share are derived from the price and the P/E / P/B ratios
-(eps = price / pe, bvps = price / pb), so nothing extra needs fetching. Every method that
-runs records an explainable `detail` line; whichever run are equal-weighted into the blend.
+EPS and book value per share use the source's reported per-share figures when present, and
+otherwise fall back to backing them out of the ratios (eps = price / pe, bvps = price / pb),
+so nothing extra needs fetching. Every method that runs records an explainable `detail` line;
+whichever run are equal-weighted into the blend.
 Missing data degrades gracefully — an empty `Valuation` (with a reason), never an exception.
 """
 
@@ -103,9 +104,14 @@ def compute_valuation(snapshot: StockSnapshot, settings: Settings | None = None)
     price = snapshot.technicals.last_close
     f = snapshot.fundamentals
 
-    # Back out per-share earnings / book value from the ratios (eps = price / pe, etc.).
-    eps = price / f.pe_ratio if f.pe_ratio and f.pe_ratio > 0 else None
-    bvps = price / f.pb_ratio if f.pb_ratio and f.pb_ratio > 0 else None
+    # Prefer the source's reported per-share figures; otherwise back them out of the ratios
+    # (eps = price / pe, bvps = price / pb).
+    eps = f.eps if f.eps and f.eps > 0 else (
+        price / f.pe_ratio if f.pe_ratio and f.pe_ratio > 0 else None
+    )
+    bvps = f.book_value if f.book_value and f.book_value > 0 else (
+        price / f.pb_ratio if f.pb_ratio and f.pb_ratio > 0 else None
+    )
     growth = _growth(f)
 
     reasons: list[str] = []

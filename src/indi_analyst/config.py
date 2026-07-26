@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     target2_rr: float = 3.5  # target 2 at 3.5R
     history_period: str = "1y"  # yfinance period for indicator computation
     news_max_items: int = 8
+    news_recency_halflife_days: float = 7.0  # sentiment weight halves every N days (0 = flat mean)
 
     # --- Fair-value (intrinsic value) tunables ---
     fair_value_discount_rate: float = 0.12  # cost of equity `r` for the Gordon DDM

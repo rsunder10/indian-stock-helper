@@ -116,9 +116,13 @@ laddered targets — that holds up whether the narrative comes from an LLM or th
 
 ## Sentiment
 
-Google News RSS headlines for the company are scored with **VADER** (`compound`, −1…1); the mean
-across headlines nudges the technical score and is shown per-headline in the dashboard. It's a
-lightweight signal, not a deep NLP model — see [roadmap.md](roadmap.md) for planned upgrades.
+Google News RSS headlines for the company are scored with **VADER** (`compound`, −1…1). Coverage
+is widened with a couple of query phrasings, near-duplicate headlines are collapsed, and results
+are returned freshest-first. The aggregate that nudges the technical score is a **recency-weighted
+mean**: each headline's weight halves every `NEWS_RECENCY_HALFLIFE_DAYS` days (default 7), so a
+stale headline counts for less than this morning's. Undated headlines get unit weight, and a
+half-life of `0` reduces the aggregate to a plain mean. The ±0.2 thresholds and ±3 score nudge are
+unchanged. It's a lightweight signal, not a deep NLP model — see [roadmap.md](roadmap.md) for more.
 
 ---
 

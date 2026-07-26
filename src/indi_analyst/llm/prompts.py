@@ -84,11 +84,18 @@ def serialize(
             "market_cap": f.market_cap,
             "pe_ratio": f.pe_ratio,
             "pb_ratio": f.pb_ratio,
+            "price_to_sales": f.price_to_sales,
+            "eps": f.eps,
+            "book_value": f.book_value,
             "roe": f.roe,
             "debt_to_equity": f.debt_to_equity,
             "profit_margin": f.profit_margin,
             "revenue_growth": f.revenue_growth,
             "dividend_yield": f.dividend_yield,
+            "dividend_rate": f.dividend_rate,
+            "next_earnings_date": (
+                f.next_earnings_date.date().isoformat() if f.next_earnings_date else None
+            ),
             "sector": f.sector,
             "industry": f.industry,
         },

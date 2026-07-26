@@ -164,6 +164,56 @@ def test_history_raises_after_exhausting_retries(monkeypatch):
     assert ticker.calls == 2
 
 
+def test_fundamentals_maps_new_per_share_fields(monkeypatch):
+    from datetime import date
+
+    class FakeTicker:
+        @property
+        def info(self):
+            return {
+                "trailingPE": 25.0,
+                "priceToBook": 3.0,
+                "priceToSalesTrailing12Months": 4.2,
+                "trailingEps": 88.5,
+                "bookValue": 410.0,
+                "dividendRate": 9.0,
+                "revenuePerShare": 512.0,
+                "returnOnEquity": 0.21,
+                "sector": "Energy",
+            }
+
+        @property
+        def calendar(self):
+            return {"Earnings Date": [date(2026, 8, 15)]}
+
+    _install_ticker(monkeypatch, FakeTicker())
+    _no_sleep(monkeypatch)
+
+    fund = yfinance_source.YFinanceSource().fundamentals("RELIANCE.NS")
+    assert fund.eps == 88.5
+    assert fund.book_value == 410.0
+    assert fund.dividend_rate == 9.0
+    assert fund.revenue_per_share == 512.0
+    assert fund.price_to_sales == 4.2
+    assert fund.next_earnings_date is not None
+    assert fund.next_earnings_date.date() == date(2026, 8, 15)
+    # Absent keys stay None.
+    assert fund.forward_pe is None
+    assert fund.debt_to_equity is None
+
+
+def test_earnings_date_handles_shapes():
+    from datetime import date, datetime, timezone
+
+    from indi_analyst.datasources.yfinance_source import _earnings_date
+
+    assert _earnings_date({"Earnings Date": [date(2026, 8, 15)]}).date() == date(2026, 8, 15)
+    assert _earnings_date({}) is None
+    assert _earnings_date(None) is None
+    df = pd.DataFrame({"Value": [datetime(2026, 8, 15, tzinfo=timezone.utc)]}, index=["Earnings Date"])
+    assert _earnings_date(df).date() == date(2026, 8, 15)
+
+
 def test_safe_info_degrades_to_empty_after_retries(monkeypatch):
     class BadInfoTicker:
         @property

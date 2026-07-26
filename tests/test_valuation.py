@@ -92,6 +92,27 @@ def test_rating_undervalued_and_threshold_honored():
     assert huge.rating == "Fairly valued"
 
 
+def test_reported_eps_and_book_value_preferred_over_ratios():
+    # When the source reports EPS / book value directly, valuation uses those rather than
+    # backing them out of P/E and P/B. Reported values differ from the ratio-implied ones,
+    # so the Graham number lands on the reported inputs.
+    snap = _snap(Fundamentals(pe_ratio=20.0, pb_ratio=3.0, eps=30.0, book_value=250.0))
+    val = compute_valuation(snap, Settings())
+    graham = next(m for m in val.methods if m.name == "Graham number")
+    expected = round(sqrt(22.5 * 30.0 * 250.0), 2)
+    assert isclose(graham.fair_value, expected, abs_tol=0.05)
+
+
+def test_falls_back_to_ratio_derived_eps_when_unreported():
+    # No reported EPS/book value -> derive from ratios exactly as before (regression guard).
+    price = _snap(Fundamentals()).technicals.last_close
+    snap = _snap(Fundamentals(pe_ratio=20.0, pb_ratio=3.0))
+    val = compute_valuation(snap, Settings())
+    graham = next(m for m in val.methods if m.name == "Graham number")
+    expected = round(sqrt(22.5 * (price / 20.0) * (price / 3.0)), 2)
+    assert isclose(graham.fair_value, expected, abs_tol=0.05)
+
+
 def test_fair_pe_cap_honored():
     snap = _snap(Fundamentals(pe_ratio=15.0, earnings_growth=0.40))
     price = snap.technicals.last_close

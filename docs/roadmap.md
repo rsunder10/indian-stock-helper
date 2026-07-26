@@ -62,16 +62,24 @@ The next milestone is reliability, not lower latency.
   `RateLimiter` + `retry`/backoff on every yfinance call; a single shared limiter paces a scan's
   worker threads so normal use does not hammer public endpoints. (Parquet snapshots remain an
   optional future nicety.)
-- 🔜 **Local universe packs** — ship versioned NIFTY 50/200/500 constituent files or allow users to
-  provide their own CSVs. A scan should not require a live exchange request just to discover symbols.
+- ✅ **Local universe packs** — versioned NIFTY 50/200/500 constituent CSVs ship inside the package
+  (`src/indi_analyst/data/`), refreshable from the free NSE Indices lists via
+  `scripts/refresh_universes.py`; users can still supply their own via `file:` / `watchlist:`. A
+  scan resolves symbols from a bundled pack (fresh cache → stale cache → the index's own pack → the
+  NIFTY 50 pack with a warning) and never needs a live exchange request just to discover symbols.
 - 🔜 **Optional low-volume adapter experiments** — evaluate providers with an explicit free tier,
   such as Alpha Vantage's daily/BSE sample coverage, but keep them opt-in because free quotas and
   exchange coverage can change. No provider becomes a hard dependency until its limits and terms are
   verified.
-- 🔜 **Deeper free fundamentals** — add public-company filings, annual/quarterly reports, corporate
-  actions, and results dates only where the source is legally accessible and the data can be cited.
-- 🔜 **Richer sentiment** — improve headline coverage and sentiment while keeping Google News RSS as
-  the no-key baseline.
+- 🔜 **Deeper free fundamentals** — *in progress:* yfinance's per-share figures (EPS, book value,
+  dividend rate, revenue/share, P/S) and the **next results date** now flow into the snapshot,
+  valuation, and UI; valuation prefers reported EPS/book value over ratio-derived ones. Still
+  planned: public-company filings, annual/quarterly reports, and corporate-action history where the
+  source is legally accessible and the data can be cited.
+- ✅ **Richer sentiment** — Google News coverage widened with multiple query phrasings and
+  duplicate-headline collapsing, returned freshest-first, with a **recency-weighted** aggregate
+  sentiment (weight halves every `NEWS_RECENCY_HALFLIFE_DAYS`) — still the no-key Google News RSS
+  baseline.
 
 ---
 

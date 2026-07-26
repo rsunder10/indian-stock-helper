@@ -61,7 +61,8 @@ Free sources, behind protocols so they're swappable and testable.
 - **`throttle.py`** — dependency-free `RateLimiter` (thread-safe minimum-interval gate; one shared
   instance paces a screener scan's worker threads as a group) and a `retry(fn, retries, backoff)`
   helper. No `tenacity`/`backoff` dependency.
-- **`news.py`** — Google News RSS headlines, scored with VADER sentiment.
+- **`news.py`** — Google News RSS headlines (multi-query, deduped, freshest-first), scored with
+  VADER sentiment. `aggregate_sentiment()` produces the recency-weighted mean used by scoring.
 - **`base.py`** — `PriceSource`, `FundamentalsSource`, `NewsSource` `Protocol`s. Depending on
   the *shape* (not the concrete class) is what lets tests inject a mock source with zero network,
   and lets future free sources drop in without touching the engine. `history()` returns a bare
@@ -126,7 +127,7 @@ breakage on Python 3.13 and keeps the math auditable. See
 
 | Model | Role |
 | --- | --- |
-| `Fundamentals` | P/E, P/B, ROE, D/E, margins, growth, sector… (all optional — free data is patchy) |
+| `Fundamentals` | P/E, P/B, P/S, ROE, D/E, margins, growth, EPS, book value/sh, dividend rate, next results date, sector… (all optional — free data is patchy) |
 | `TechnicalSignals` | Latest-bar indicators + trend/level context |
 | `NewsItem` | Headline + VADER sentiment |
 | `StockSnapshot` | **The deterministic source of truth** — everything above, plus warnings and `data_source` / `data_as_of` provenance |

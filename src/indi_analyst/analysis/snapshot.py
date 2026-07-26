@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from statistics import mean
+from datetime import datetime, timezone
 
 import pandas as pd
 
 from indi_analyst.config import Settings, get_settings
 from indi_analyst.datasources.factory import build_price_source
-from indi_analyst.datasources.news import GoogleNewsSource
+from indi_analyst.datasources.news import GoogleNewsSource, aggregate_sentiment
 from indi_analyst.indicators import technical
 from indi_analyst.models import StockSnapshot
 
@@ -49,9 +49,20 @@ def build_snapshot(
     news_sentiment = None
     if news_source is not None:
         news = news_source.news(name or symbol, max_items=settings.news_max_items)
-        sentiments = [n.sentiment for n in news if n.sentiment is not None]
-        if sentiments:
-            news_sentiment = round(mean(sentiments), 3)
+        news_sentiment = aggregate_sentiment(
+            news, halflife_days=settings.news_recency_halflife_days
+        )
+        if len(news) < 3:
+            warnings.append(f"Thin news coverage — only {len(news)} headline(s) found.")
+        else:
+            freshest = max(
+                (n.published for n in news if n.published is not None),
+                default=None,
+            )
+            if freshest is not None:
+                age_days = (datetime.now(timezone.utc) - freshest).days
+                if age_days > 14:
+                    warnings.append(f"Stale news — freshest headline is {age_days} days old.")
 
     return StockSnapshot(
         symbol=symbol,

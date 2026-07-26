@@ -118,6 +118,7 @@ Loaded by `config.py` via pydantic-settings; environment variables override `.en
 | `TARGET2_RR` | `3.5` | Target 2 at N×risk |
 | `HISTORY_PERIOD` | `1y` | yfinance history window for indicators |
 | `NEWS_MAX_ITEMS` | `8` | Headlines fetched |
+| `NEWS_RECENCY_HALFLIFE_DAYS` | `7.0` | Sentiment weight halves every N days (0 = flat mean) |
 | `LLM_TIMEOUT` | `90.0` | Per-request timeout (seconds) |
 | `YF_MAX_RETRIES` | `3` | Attempts per yfinance call before giving up |
 | `YF_RETRY_BACKOFF` | `0.5` | Base seconds for exponential backoff between retries |

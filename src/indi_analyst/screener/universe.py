@@ -1,10 +1,12 @@
 """Resolve a universe name to its constituents.
 
 Resolution chain:
-    fresh cache  ->  stale cache  ->  bundled data/nifty50.csv
+    fresh cache  ->  stale cache  ->  bundled data/<key>.csv  ->  bundled data/nifty50.csv
 
 Any cache or bundled lookup can fail for an unknown index, and we degrade to the next available
-local source, appending a human-readable warning rather than raising.
+local source, appending a human-readable warning rather than raising. Versioned constituent packs
+(nifty50/200/500) ship inside the package under ``data/`` and are refreshed via
+``scripts/refresh_universes.py`` — the analysis path never makes a live index request.
 
 Also supports ad-hoc universes:
     watchlist:RELIANCE,TCS,INFY     inline comma-separated symbols
@@ -52,11 +54,12 @@ def _parse_constituent_csv(text: str) -> list[Constituent]:
     return members
 
 
-def _bundled_nifty50() -> list[Constituent]:
-    """The always-available offline fallback shipped inside the package."""
-    with resources.files("indi_analyst").joinpath("data/nifty50.csv").open(
-        "r", encoding="utf-8"
-    ) as fh:
+def _bundled(key: str) -> list[Constituent] | None:
+    """Load a bundled constituent pack ``data/<key>.csv``, or None if no pack ships for it."""
+    resource = resources.files("indi_analyst").joinpath(f"data/{key}.csv")
+    if not resource.is_file():
+        return None
+    with resource.open("r", encoding="utf-8") as fh:
         return _parse_constituent_csv(fh.read())
 
 
@@ -112,7 +115,13 @@ def load_universe(
         warn.append(f"Using stale cached constituents for {key}.")
         return cached[0]
 
-    # Bundled fallback — only truly correct for nifty50, but better than nothing.
-    if key != "nifty50":
-        warn.append(f"No cached {key}; falling back to the bundled NIFTY 50 list.")
-    return _bundled_nifty50()
+    # Bundled pack for the requested index, if one ships.
+    pack = _bundled(key)
+    if pack is not None:
+        return pack
+
+    # No pack for this key — degrade to the always-present NIFTY 50 list.
+    warn.append(f"No cached or bundled {key}; falling back to the bundled NIFTY 50 list.")
+    fallback = _bundled("nifty50")
+    assert fallback is not None  # nifty50.csv always ships
+    return fallback
