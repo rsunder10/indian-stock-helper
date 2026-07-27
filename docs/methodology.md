@@ -1,9 +1,9 @@
 # Methodology
 
-How `indi-analyst` turns raw prices into a **score**, an **action**, and **trade levels** — all
-deterministically, before any LLM runs. Everything here lives in
-`indicators/technical.py`, `analysis/scoring.py`, and `analysis/levels.py`, and every parameter
-is tunable in `config.py` / `.env`.
+How `indi-analyst` turns raw prices into a **score**, an **action**, **trade levels**, and a
+**fair value** — all deterministically, before any LLM runs. Everything here lives in
+`indicators/technical.py`, `analysis/scoring.py`, `analysis/levels.py`, and
+`analysis/valuation.py`, and every parameter is tunable in `config.py` / `.env`.
 
 > This is a transparent, rules-based framework — not a predictive model. Treat outputs as a
 > structured starting point for your own research, not a forecast.
@@ -111,6 +111,43 @@ missing it falls back to 2% of price.
 
 The result is a coherent plan — entry band, a stop that respects volatility *and* structure, and
 laddered targets — that holds up whether the narrative comes from an LLM or the rule-based engine.
+
+---
+
+## Fair value (`analysis/valuation.py`)
+
+An intrinsic-value estimate — "what is it worth?" — computed deterministically before any LLM
+runs, alongside the trade levels. A full DCF is impossible on free yfinance data (no cash-flow
+statements), so we blend up to three cheap, transparent methods built from ratios we already have.
+Each is a different lens; equal-weighting them keeps any single one from dominating.
+
+### Inputs
+
+- **EPS** and **book value per share (BVPS)** use the source's reported per-share figures when
+  present; otherwise they're backed out of the ratios (`eps = price / P/E`, `bvps = price / P/B`),
+  so nothing extra needs fetching.
+- **Growth** prefers earnings growth, falling back to revenue growth.
+
+### Methods
+
+| Method | Formula | Runs when |
+| --- | --- | --- |
+| **Graham number** | `√(22.5 · EPS · BVPS)` — a conservative value floor | EPS > 0 and BVPS > 0 |
+| **Earnings power** | fair P/E × EPS, where fair P/E ≈ growth% (PEG≈1), clamped to `[FAIR_PE_FLOOR, FAIR_PE_CAP]` = `[10, 35]`; `FAIR_PE_BASE` (15) when growth is unknown | EPS > 0 |
+| **Dividend discount** | Gordon growth: `D₀·(1+g) / (r − g)`, with `r` = `FAIR_VALUE_DISCOUNT_RATE` (12%) and `g` capped at `FAIR_VALUE_TERMINAL_GROWTH` (5%) | dividend payer, and `r − g ≥ 2%` |
+
+### Blending → fair value, margin, confidence
+
+- Each method's estimate is **sanity-bounded** to `[0.1×, 10×]` the current price; an outlier is
+  dropped (with a reason) so one wild number can't distort the blend.
+- The **fair value** is the simple average of the surviving methods; `low` / `high` are their
+  min / max.
+- **Margin of safety** = `(fair_value − price) / price`. Beyond ±`MARGIN_OF_SAFETY` (default 15%)
+  it flips the rating to **Undervalued** / **Overvalued**; inside the band it's **Fairly valued**.
+- **Confidence** tracks how many methods ran: 3 → HIGH, 2 → MEDIUM, 1 → LOW.
+
+If no method can run (P/E, P/B, and dividend data all missing), an empty `Valuation` is returned
+with a reason — never an exception. Every parameter above is tunable in `config.py` / `.env`.
 
 ---
 
