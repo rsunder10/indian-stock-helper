@@ -45,6 +45,30 @@ def build_snapshot(
     technicals = technical.compute(df)
     fundamentals = price_source.fundamentals(symbol)
 
+    # Corporate actions (dividend/split history) are optional: sources that don't expose them
+    # simply leave `corporate_actions` None. `as_of` ties split-recency to the data's freshness
+    # so the result is deterministic rather than clock-dependent.
+    corporate_actions = None
+    get_actions = getattr(price_source, "corporate_actions", None)
+    if callable(get_actions):
+        try:
+            corporate_actions = get_actions(
+                symbol,
+                as_of=data_as_of.date() if isinstance(data_as_of, datetime) else None,
+                lookback_years=settings.corporate_action_lookback_years,
+                split_recency_days=settings.split_recency_days,
+            )
+        except Exception:
+            corporate_actions = None
+    if corporate_actions and corporate_actions.recent_split:
+        ratio = corporate_actions.last_split_ratio or "recent"
+        when = corporate_actions.last_split_date
+        warnings.append(
+            f"Recent {ratio} stock split"
+            + (f" on {when:%Y-%m-%d}" if when else "")
+            + " — pre-split price levels may look discontinuous."
+        )
+
     news = []
     news_sentiment = None
     if news_source is not None:
@@ -71,6 +95,7 @@ def build_snapshot(
         exchange=exchange,
         technicals=technicals,
         fundamentals=fundamentals,
+        corporate_actions=corporate_actions,
         news=news,
         news_sentiment=news_sentiment,
         warnings=warnings,

@@ -115,10 +115,26 @@ def compute_valuation(snapshot: StockSnapshot, settings: Settings | None = None)
     growth = _growth(f)
 
     reasons: list[str] = []
+
+    # The Gordon dividend-discount model assumes a durable payout. When we have corporate-action
+    # history, only trust it for demonstrated consistent payers; skip it (with a stated reason)
+    # for erratic/one-off payers. With no history available (ca is None), behaviour is unchanged.
+    dd = _dividend_discount(price, f.dividend_yield, growth, settings)
+    ca = snapshot.corporate_actions
+    if dd is not None and ca is not None and ca.dividend_paying_years is not None:
+        if ca.dividend_paying_years >= settings.dividend_min_consistent_years:
+            dd.detail += f" · paid in {ca.dividend_paying_years} of last {ca.lookback_years} yrs"
+        else:
+            reasons.append(
+                f"Dividend discount skipped — dividends in only {ca.dividend_paying_years} of the "
+                f"last {ca.lookback_years} years, too inconsistent to model a durable payout."
+            )
+            dd = None
+
     candidates = [
         _graham(price, eps, bvps),
         _earnings_power(eps, growth, settings),
-        _dividend_discount(price, f.dividend_yield, growth, settings),
+        dd,
     ]
 
     methods: list[ValuationMethod] = []

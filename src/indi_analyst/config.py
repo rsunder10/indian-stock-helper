@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     fair_pe_cap: float = 35.0  # highest justified P/E (avoids paying any multiple)
     margin_of_safety: float = 0.15  # +/- band that flips under/fairly/over-valued
 
+    # --- Corporate actions (free dividend/split history) ---
+    corporate_action_lookback_years: int = 6  # window for counting dividend-paying years
+    dividend_min_consistent_years: int = 3  # min paying years in the window to trust the DDM
+    split_recency_days: int = 365  # a split this recent flags recent_split / a snapshot warning
+
     # LLM request timeout (seconds)
     llm_timeout: float = 90.0
 

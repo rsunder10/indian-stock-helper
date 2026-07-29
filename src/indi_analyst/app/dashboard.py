@@ -203,6 +203,13 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
             "Next results": (f.next_earnings_date.date().isoformat() if f.next_earnings_date else None),
             "Sector": f.sector, "Industry": f.industry,
         }
+        ca = s.corporate_actions
+        if ca is not None:
+            if ca.dividend_paying_years is not None and ca.lookback_years:
+                rows["Dividend history"] = f"paid in {ca.dividend_paying_years} of last {ca.lookback_years} yrs"
+            if ca.last_split_ratio and ca.last_split_date is not None:
+                tag = " (recent)" if ca.recent_split else ""
+                rows["Last split"] = f"{ca.last_split_ratio} on {ca.last_split_date.isoformat()}{tag}"
         st.table({k: [("—" if v is None else v)] for k, v in rows.items()})
 
     if s.news:

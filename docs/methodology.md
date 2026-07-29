@@ -134,7 +134,16 @@ Each is a different lens; equal-weighting them keeps any single one from dominat
 | --- | --- | --- |
 | **Graham number** | `√(22.5 · EPS · BVPS)` — a conservative value floor | EPS > 0 and BVPS > 0 |
 | **Earnings power** | fair P/E × EPS, where fair P/E ≈ growth% (PEG≈1), clamped to `[FAIR_PE_FLOOR, FAIR_PE_CAP]` = `[10, 35]`; `FAIR_PE_BASE` (15) when growth is unknown | EPS > 0 |
-| **Dividend discount** | Gordon growth: `D₀·(1+g) / (r − g)`, with `r` = `FAIR_VALUE_DISCOUNT_RATE` (12%) and `g` capped at `FAIR_VALUE_TERMINAL_GROWTH` (5%) | dividend payer, and `r − g ≥ 2%` |
+| **Dividend discount** | Gordon growth: `D₀·(1+g) / (r − g)`, with `r` = `FAIR_VALUE_DISCOUNT_RATE` (12%) and `g` capped at `FAIR_VALUE_TERMINAL_GROWTH` (5%) | dividend payer, `r − g ≥ 2%`, **and a consistent payout** (see below) |
+
+**Dividend-consistency gate.** The Gordon model assumes a *durable* payout, so a one-off or erratic
+dividend shouldn't drive a fair value. When free corporate-action history is available (see
+[Corporate actions](#corporate-actions)), the method runs only for demonstrated consistent
+payers — dividends in at least `DIVIDEND_MIN_CONSISTENT_YEARS` (default 3) of the last
+`CORPORATE_ACTION_LOOKBACK_YEARS` (default 6) years. Below that it's skipped with a stated reason.
+When no corporate-action history is available, behaviour is unchanged (the method runs on yield
+alone). Note this deliberately skips young-but-consistent payers with less than the threshold of
+years listed — the perpetuity model needs a track record.
 
 ### Blending → fair value, margin, confidence
 
@@ -148,6 +157,24 @@ Each is a different lens; equal-weighting them keeps any single one from dominat
 
 If no method can run (P/E, P/B, and dividend data all missing), an empty `Valuation` is returned
 with a reason — never an exception. Every parameter above is tunable in `config.py` / `.env`.
+
+---
+
+## Corporate actions
+
+Free dividend + split history comes from a single `yfinance` `Ticker.actions` call (no scraping,
+no key), parsed into a `CorporateActions` object on the snapshot. It is **optional**: a source
+without it, or a stock with no action history, leaves `corporate_actions` `None`.
+
+- **Dividend consistency** — distinct calendar years with a dividend inside a
+  `CORPORATE_ACTION_LOOKBACK_YEARS` window, used only to gate the dividend-discount method (above).
+- **Splits** — the most recent split ratio + date; a split within `SPLIT_RECENCY_DAYS` of the data
+  as-of date is flagged `recent_split` and surfaces a snapshot warning (pre-split levels can look
+  discontinuous). Split recency is measured against the **data's** freshness, not wall-clock time,
+  so results are deterministic.
+
+Corporate actions never fabricate a value: absence is preserved as `None`, and the only place they
+change a number is by *removing* an unreliable dividend-discount estimate from the blend.
 
 ---
 

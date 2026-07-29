@@ -53,6 +53,22 @@ def _fundamentals_line(f) -> str:
     return "   ".join(parts)
 
 
+def _corporate_actions_lines(ca) -> list[str]:
+    """Compact dividend/split history lines. Empty list when the source had no actions."""
+    if ca is None:
+        return []
+    out: list[str] = []
+    if ca.dividend_paying_years is not None and ca.lookback_years:
+        line = f"Dividends: paid in {ca.dividend_paying_years} of last {ca.lookback_years} yrs"
+        if ca.last_dividend is not None and ca.last_dividend_date is not None:
+            line += f" · last ₹{ca.last_dividend:,.2f} on {ca.last_dividend_date:%Y-%m-%d}"
+        out.append(line)
+    if ca.last_split_ratio and ca.last_split_date is not None:
+        tag = " (recent)" if ca.recent_split else ""
+        out.append(f"Split: {ca.last_split_ratio} on {ca.last_split_date:%Y-%m-%d}{tag}")
+    return out
+
+
 def render(rec: Recommendation) -> str:
     s, t, lv, v, q = rec.snapshot, rec.snapshot.technicals, rec.levels, rec.verdict, rec.quant
     val = rec.valuation
@@ -108,12 +124,16 @@ def render(rec: Recommendation) -> str:
         for m in val.methods:
             lines.append(f"    · {m.detail}")
     fund_line = _fundamentals_line(s.fundamentals)
-    if fund_line:
+    ca_lines = _corporate_actions_lines(s.corporate_actions)
+    if fund_line or ca_lines:
         lines.append("")
         lines.append("FUNDAMENTALS")
-        lines.append(f"  {fund_line}")
+        if fund_line:
+            lines.append(f"  {fund_line}")
         if s.fundamentals.next_earnings_date is not None:
             lines.append(f"  Next results: {s.fundamentals.next_earnings_date:%Y-%m-%d}")
+        for cl in ca_lines:
+            lines.append(f"  {cl}")
     lines.append("")
     lines.append("THESIS")
     for b in v.thesis:

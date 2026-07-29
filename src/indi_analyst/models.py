@@ -6,7 +6,7 @@ needs to reason about a stock is captured here deterministically, before any LLM
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -56,6 +56,24 @@ class Fundamentals(BaseModel):
     next_earnings_date: datetime | None = None  # next scheduled results date, if known
     sector: str | None = None
     industry: str | None = None
+
+
+class CorporateActions(BaseModel):
+    """Free dividend + split history from the price source. All optional.
+
+    Sources that don't expose corporate actions leave the whole object off the snapshot
+    (`StockSnapshot.corporate_actions is None`), so downstream logic never assumes it exists.
+    Facts are stored raw (counts, dates, ratios); interpretation (e.g. "consistent payer")
+    is derived where it's used, against config thresholds.
+    """
+
+    dividend_paying_years: int | None = None  # distinct calendar years with a dividend, in the window
+    lookback_years: int | None = None  # size of the window examined (for transparent detail)
+    last_dividend: float | None = None  # most recent dividend per share, currency units
+    last_dividend_date: date | None = None
+    last_split_ratio: str | None = None  # e.g. "2:1" (bonus/split) or "1:5" (reverse)
+    last_split_date: date | None = None
+    recent_split: bool | None = None  # split within the recency window of the data as-of date
 
 
 class TechnicalSignals(BaseModel):
@@ -119,6 +137,7 @@ class StockSnapshot(BaseModel):
     data_as_of: datetime | None = None  # timestamp of the latest price bar (data freshness)
 
     fundamentals: Fundamentals = Field(default_factory=Fundamentals)
+    corporate_actions: CorporateActions | None = None  # dividend/split history, when the source has it
     technicals: TechnicalSignals
     news: list[NewsItem] = Field(default_factory=list)
     news_sentiment: float | None = None  # mean VADER compound across headlines

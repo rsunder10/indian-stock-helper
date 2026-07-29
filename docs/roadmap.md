@@ -71,11 +71,15 @@ The next milestone is reliability, not lower latency.
   such as Alpha Vantage's daily/BSE sample coverage, but keep them opt-in because free quotas and
   exchange coverage can change. No provider becomes a hard dependency until its limits and terms are
   verified.
-- 🔜 **Deeper free fundamentals** — *in progress:* yfinance's per-share figures (EPS, book value,
-  dividend rate, revenue/share, P/S) and the **next results date** now flow into the snapshot,
-  valuation, and UI; valuation prefers reported EPS/book value over ratio-derived ones. Still
-  planned: public-company filings, annual/quarterly reports, and corporate-action history where the
-  source is legally accessible and the data can be cited.
+- ✅ **Deeper free fundamentals** — yfinance's per-share figures (EPS, book value, dividend rate,
+  revenue/share, P/S) and the **next results date** flow into the snapshot, valuation, and UI;
+  valuation prefers reported EPS/book value over ratio-derived ones. **Free corporate-action
+  history** (dividends + splits from `Ticker.actions`) now rides on the snapshot: a
+  dividend-consistency count *gates* the dividend-discount model to genuine payers, and recent
+  splits raise a data-quality warning. Public-company filings and annual/quarterly-report parsing
+  are deliberately deferred to **Phase 4** — they need fragile scraping or a paid source, which
+  breaks the free-source-first, no-scraping guarantee; per-share figures already cover the
+  high-value fundamentals.
 - ✅ **Richer sentiment** — Google News coverage widened with multiple query phrasings and
   duplicate-headline collapsing, returned freshest-first, with a **recency-weighted** aggregate
   sentiment (weight halves every `NEWS_RECENCY_HALFLIFE_DAYS`) — still the no-key Google News RSS
@@ -104,6 +108,10 @@ The next milestone is reliability, not lower latency.
 - **Explainability & audit** — persist the full snapshot + reasons for every recommendation so
   any call can be reconstructed and reviewed.
 - **Evaluation harness** — track recommendation outcomes over time to keep the framework honest.
+- **Filings-grade fundamentals** (deferred from Phase 2) — public-company filings and
+  annual/quarterly reports, only where a source is legally accessible and each figure can be cited.
+  Held here because it needs more than a free no-key endpoint; the Phase 2 path stops at yfinance's
+  per-share figures + corporate actions.
 
 ---
 

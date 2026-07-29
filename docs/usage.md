@@ -105,8 +105,18 @@ pure string formatting over the already-computed numbers (`explain_valuation()` 
 above it. The same explanation appears in the Streamlit dashboard's "Fair value" expander, under a
 "Why ₹X?" heading, with the raw formula table collapsed below it under "The maths".
 
+**Corporate actions.** When free dividend/split history is available, the FUNDAMENTALS block adds a
+`Dividends: paid in N of last M yrs` line (with the most recent dividend) and a `Split:` line, and a
+recent split raises a NOTE about discontinuous pre-split levels. This history also **gates the
+dividend-discount method**: it runs only for demonstrated consistent payers (dividends in at least
+`DIVIDEND_MIN_CONSISTENT_YEARS` of the last `CORPORATE_ACTION_LOOKBACK_YEARS` years), so a one-off
+special dividend no longer produces a fair value. With no history available, the method runs on
+yield alone as before.
+
 Tune the model via `.env` — `FAIR_VALUE_DISCOUNT_RATE`, `FAIR_VALUE_TERMINAL_GROWTH`,
-`FAIR_PE_BASE` / `FAIR_PE_FLOOR` / `FAIR_PE_CAP`, and `MARGIN_OF_SAFETY` (see `.env.example`).
+`FAIR_PE_BASE` / `FAIR_PE_FLOOR` / `FAIR_PE_CAP`, `MARGIN_OF_SAFETY`, and the corporate-action
+knobs `CORPORATE_ACTION_LOOKBACK_YEARS` / `DIVIDEND_MIN_CONSISTENT_YEARS` / `SPLIT_RECENCY_DAYS`
+(see `.env.example`).
 
 In the screener, fair value surfaces as an **UPSIDE** column and a `--min-upside` filter (e.g.
 `--min-upside 0.15` keeps only names trading ≥15% below fair value).

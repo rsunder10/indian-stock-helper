@@ -16,9 +16,71 @@ import pandas as pd
 import yfinance as yf
 
 from indi_analyst.datasources.throttle import RateLimiter, retry
-from indi_analyst.models import Fundamentals
+from indi_analyst.models import CorporateActions, Fundamentals
 
 _OHLC = ["Open", "High", "Low", "Close"]
+
+
+def _split_ratio(v: float) -> str | None:
+    """Format a yfinance split factor as a human ratio. 2.0 -> "2:1"; 0.2 -> "1:5" (reverse)."""
+    if not v or v <= 0 or v == 1:
+        return None
+    return f"{v:g}:1" if v > 1 else f"1:{1 / v:g}"
+
+
+def _corporate_actions(
+    actions,
+    *,
+    as_of: date | None,
+    lookback_years: int,
+    split_recency_days: int,
+) -> CorporateActions | None:
+    """Parse yfinance's ``Ticker.actions`` frame into a `CorporateActions`, or None if empty.
+
+    Pure/offline so it can be unit-tested with a synthetic frame. Returns None only when there
+    is no action history at all; a stock with history but no recent dividends yields a real
+    zero-count (which the valuation gate treats as "not a consistent payer"), not None.
+    """
+    if not isinstance(actions, pd.DataFrame) or actions.empty:
+        return None
+    try:
+        dates = [pd.Timestamp(ts).date() for ts in actions.index]
+    except Exception:
+        return None
+
+    ref = as_of or max(dates)
+    div_col = actions["Dividends"].to_list() if "Dividends" in actions.columns else None
+    split_col = actions["Stock Splits"].to_list() if "Stock Splits" in actions.columns else None
+
+    dividend_paying_years = last_dividend = last_dividend_date = None
+    if div_col is not None:
+        min_year = ref.year - lookback_years + 1
+        paid_years: set[int] = set()
+        for d, v in zip(dates, div_col):
+            if v and v > 0:
+                if min_year <= d.year <= ref.year:
+                    paid_years.add(d.year)
+                if last_dividend_date is None or d > last_dividend_date:
+                    last_dividend_date, last_dividend = d, float(v)
+        dividend_paying_years = len(paid_years)
+
+    last_split_date = last_split_ratio = recent_split = None
+    if split_col is not None:
+        for d, v in zip(dates, split_col):
+            if v and v > 0 and v != 1 and (last_split_date is None or d > last_split_date):
+                last_split_date, last_split_ratio = d, _split_ratio(float(v))
+        if last_split_date is not None:
+            recent_split = (ref - last_split_date).days <= split_recency_days
+
+    return CorporateActions(
+        dividend_paying_years=dividend_paying_years,
+        lookback_years=lookback_years if div_col is not None else None,
+        last_dividend=last_dividend,
+        last_dividend_date=last_dividend_date,
+        last_split_ratio=last_split_ratio,
+        last_split_date=last_split_date,
+        recent_split=recent_split,
+    )
 
 
 def _earnings_date(calendar) -> datetime | None:
@@ -191,6 +253,36 @@ class YFinanceSource:
             next_earnings_date=self._next_earnings_date(symbol),
             sector=info.get("sector"),
             industry=info.get("industry"),
+        )
+
+    def corporate_actions(
+        self,
+        symbol: str,
+        *,
+        as_of: date | None = None,
+        lookback_years: int = 6,
+        split_recency_days: int = 365,
+    ) -> CorporateActions | None:
+        """Best-effort dividend + split history from Yahoo's single ``actions`` frame.
+
+        One rate-limited/retried call. Degrades to None on any failure or absence, so a stock
+        with no corporate-action history leaves the snapshot's `corporate_actions` unset rather
+        than raising.
+        """
+        self._limiter.acquire()
+        try:
+            actions = retry(
+                lambda: yf.Ticker(symbol).actions,
+                retries=self._retries,
+                backoff=self._backoff,
+            )
+        except Exception:
+            return None
+        return _corporate_actions(
+            actions,
+            as_of=as_of,
+            lookback_years=lookback_years,
+            split_recency_days=split_recency_days,
         )
 
     def _next_earnings_date(self, symbol: str):
