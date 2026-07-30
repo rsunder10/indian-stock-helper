@@ -12,6 +12,8 @@ from plotly.subplots import make_subplots
 
 from indi_analyst.analysis.engine import analyze
 from indi_analyst.analysis.valuation import explain_valuation
+from indi_analyst.backtest import run_backtest
+from indi_analyst.backtest.models import BacktestResult, BacktestStats
 from indi_analyst.config import get_settings
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.indicators import technical
@@ -48,6 +50,15 @@ def _run(query: str, provider: str, period: str) -> Recommendation:
 def _scan(universe: str, provider: str, limit: int | None) -> ScanResult:
     return scan_universe(universe, provider=provider, limit=limit,
                          price_source=build_price_source(), use_cache=True)
+
+
+@st.cache_data(show_spinner=False, ttl=1800)
+def _backtest(target: str, period: str, hold: int, limit: int) -> BacktestResult:
+    settings = get_settings()
+    settings.backtest_history_period = period
+    settings.backtest_max_hold_bars = hold
+    return run_backtest(target, settings=settings, limit=limit,
+                        price_source=build_price_source(settings))
 
 
 def _price_chart(df: pd.DataFrame) -> go.Figure:
@@ -319,21 +330,149 @@ def _screener_view(settings, provider: str) -> None:
             st.error(f"Could not analyze '{pick}': {e}")
 
 
+def _bt_pct(x: float | None) -> str:
+    return f"{x * 100:+.1f}%" if x is not None else "—"
+
+
+def _bt_stats_row(name: str, s: BacktestStats) -> dict:
+    """A BacktestStats block flattened into one display row."""
+    return {
+        "Group": name,
+        "Trades": s.trades,
+        "Win rate": f"{s.win_rate * 100:.0f}%" if s.win_rate is not None else "—",
+        "Expectancy (R)": f"{s.expectancy_r:+.2f}" if s.expectancy_r is not None else "—",
+        "Avg return": _bt_pct(s.avg_return_pct),
+        "Profit factor": f"{s.profit_factor:.2f}" if s.profit_factor is not None else "—",
+        "Max DD": _bt_pct(s.max_drawdown),
+    }
+
+
+def _backtest_view(settings) -> None:
+    with st.sidebar:
+        target = st.text_input(
+            "Symbol or universe", value="RELIANCE",
+            help="A ticker (RELIANCE), watchlist:TCS,INFY, file:/path.csv, or nifty50/200/500.",
+        )
+        period = st.selectbox("History", ["2y", "3y", "5y", "max"], index=2)
+        hold = st.slider("Max hold (bars)", 5, 120, settings.backtest_max_hold_bars, step=5)
+        limit = st.slider(
+            "Max symbols (batch runs)", 1, 50, 10, step=1,
+            help="Caps how many names a watchlist/index backtest fetches, so the run stays responsive. "
+                 "Full-index runs are better on the CLI.",
+        )
+        go_btn = st.button("Run backtest", type="primary", width="stretch")
+
+    st.caption(
+        "Technical-signal backtest — fundamentals/news are excluded (not point-in-time available "
+        "from the free source). It measures the timing signal, not the fundamental score."
+    )
+
+    if go_btn:
+        try:
+            with st.spinner(f"Backtesting {target} over {period} …"):
+                st.session_state["backtest"] = _backtest(target.strip(), period, hold, limit)
+        except Exception as e:
+            st.error(f"Could not backtest '{target}': {e}")
+            return
+
+    result: BacktestResult | None = st.session_state.get("backtest")
+    if result is None:
+        st.info("Enter a symbol or universe and press **Run backtest**.")
+        return
+
+    s = result.stats
+    st.subheader(
+        f"{result.target} — {s.trades} trades across {result.ok_symbols}/{result.symbols} symbol(s)"
+    )
+    st.caption(
+        f"period {result.period} · entry {'/'.join(a.value for a in result.entry_actions)} · "
+        f"warmup {result.warmup_bars}b · max-hold {result.max_hold_bars}b"
+    )
+
+    cols = st.columns(6)
+    cols[0].metric("Win rate", f"{s.win_rate * 100:.0f}%" if s.win_rate is not None else "—")
+    cols[1].metric("Expectancy", f"{s.expectancy_r:+.2f}R" if s.expectancy_r is not None else "—")
+    cols[2].metric("Profit factor", f"{s.profit_factor:.2f}" if s.profit_factor is not None else "—")
+    cols[3].metric("Avg return / trade", _bt_pct(s.avg_return_pct))
+    cols[4].metric("Max drawdown", _bt_pct(s.max_drawdown))
+    cols[5].metric("Vs buy & hold", _bt_pct(s.buy_hold_return),
+                   help="Mean per-symbol buy-and-hold return over the same window.")
+
+    for w in result.warnings:
+        st.warning(w)
+
+    if not s.trades:
+        st.info("No trades were generated — try a longer history or a different symbol/universe.")
+        return
+
+    if result.by_action:
+        st.markdown("**By entry action**")
+        st.dataframe(
+            pd.DataFrame([_bt_stats_row(k, v) for k, v in result.by_action.items()]),
+            width="stretch", hide_index=True,
+        )
+    if result.by_conviction:
+        st.markdown("**By conviction**")
+        st.dataframe(
+            pd.DataFrame([_bt_stats_row(k, v) for k, v in result.by_conviction.items()]),
+            width="stretch", hide_index=True,
+        )
+
+    per = [r for r in result.per_symbol if r.error is None and r.trades]
+    if len(per) > 1:
+        st.markdown("**Per symbol**")
+        st.dataframe(
+            pd.DataFrame([
+                {"Symbol": r.symbol, "Trades": len(r.trades), "Buy & hold": _bt_pct(r.buy_hold_return)}
+                for r in sorted(per, key=lambda r: len(r.trades), reverse=True)
+            ]),
+            width="stretch", hide_index=True,
+        )
+
+    with st.expander(f"All trades ({s.trades})"):
+        st.dataframe(
+            pd.DataFrame([
+                {
+                    "Symbol": t.symbol,
+                    "Entry": t.entry_date.isoformat(),
+                    "Exit": t.exit_date.isoformat(),
+                    "Reason": t.exit_reason,
+                    "Return": _bt_pct(t.return_pct),
+                    "R": t.r_multiple,
+                    "Bars": t.bars_held,
+                    "Action": t.entry_action.value,
+                    "Conv": t.entry_conviction.value,
+                }
+                for r in per for t in r.trades
+            ]),
+            width="stretch", hide_index=True,
+        )
+
+    st.caption(
+        "Research/education only. Bar-resolution model — no intraday path, slippage, or costs; "
+        "the shipped weights are not yet tuned to these results."
+    )
+
+
 def main() -> None:
     st.title("📈 indi-analyst")
     st.caption("Indian (NSE/BSE) stock analysis — buy / target / stop-loss with a facts-based thesis.")
 
     settings = get_settings()
     with st.sidebar:
-        mode = st.radio("Mode", ["Single stock", "Screener"], horizontal=True)
+        mode = st.radio("Mode", ["Single stock", "Screener", "Backtest"], horizontal=True)
         st.header(mode)
-        providers = settings.configured_providers()
-        default_idx = providers.index(settings.default_llm_provider) if settings.default_llm_provider in providers else 0
-        provider = st.selectbox("LLM provider", providers, index=default_idx)
+        provider = None
+        if mode != "Backtest":  # the backtest is technical-only — no LLM verdict involved
+            providers = settings.configured_providers()
+            default_idx = providers.index(settings.default_llm_provider) if settings.default_llm_provider in providers else 0
+            provider = st.selectbox("LLM provider", providers, index=default_idx)
         st.caption("Price source: yfinance (free delayed/EOD baseline)")
 
     if mode == "Screener":
         _screener_view(settings, provider)
+    elif mode == "Backtest":
+        _backtest_view(settings)
     else:
         _single_stock_view(settings, provider)
 
