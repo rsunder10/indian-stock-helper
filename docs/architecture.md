@@ -114,12 +114,29 @@ breakage on Python 3.13 and keeps the math auditable. See
 - **`factory.py`** — `build_provider_with_fallback()` constructs the configured provider and, on
   any failure, returns the rule-based provider with a note (surfaced as a snapshot warning).
 
-### 5. Interfaces
+### 5. Backtesting — `src/indi_analyst/backtest/`
+
+A consumer of the deterministic core (like the screener), not a new analytical layer. Walk-forward
+replay of the real pipeline over history:
+
+- **`replay.py`** — `snapshot_at(df, i)` computes `technical.compute(df.iloc[:i+1])`, which is
+  look-ahead-free (indicators read only trailing windows / the last bar). **Technical-only**:
+  fundamentals/news are not point-in-time available from the free source, so they are left empty.
+- **`simulator.py`** — `simulate_symbol` walks each bar: `score` → on an entry action, enter at the
+  **next** bar's open, then `resolve_exit` walks to the frozen `compute_levels` stop / first target /
+  max-hold timeout (same-bar stop+target books the stop, conservatively).
+- **`metrics.py`** — win rate, expectancy (mean R), profit factor, drawdown, and a buy-and-hold
+  benchmark; sliced by action and conviction.
+- **`engine.py`** — `run_backtest(target)` resolves a symbol or a screener universe, fetches
+  multi-year history per symbol (shared rate-limited source), and aggregates. Per-symbol failures
+  isolate like `scan_universe`.
+
+### 6. Interfaces
 
 - **`app/dashboard.py`** — Streamlit: ticker input, provider selector, candlestick + RSI/MACD
   charts (Plotly), fundamentals, news, and a recommendation card.
 - **`cli.py`** — `indi-analyst <ticker> [--provider ...]`, a rich terminal report. Also the
-  quickest way to smoke-test the pipeline.
+  quickest way to smoke-test the pipeline. Subcommands `screen` and `backtest` reuse the same core.
 
 ---
 
@@ -153,5 +170,7 @@ The design is deliberately open at three seams:
 3. **New scoring/level logic** — `scoring.py` and `levels.py` are pure functions over a
    `StockSnapshot`; tune the weights/thresholds in `config.py` or swap the functions wholesale.
 
-Because the engine returns a plain `Recommendation`, a different UI (the planned FastAPI + JS
-frontend) or a batch **screener** is a thin layer on top — no core changes required.
+Because the engine returns a plain `Recommendation` and the analysis functions are pure over a
+`StockSnapshot`, consumers layer on top with no core changes: a different UI (the planned FastAPI + JS
+frontend), the batch **screener**, and the **backtester** — which replays those same pure functions
+bar by bar over history — are all thin layers over the deterministic core.

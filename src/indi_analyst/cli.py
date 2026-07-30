@@ -7,6 +7,9 @@ Usage:
 
     indi-analyst screen --universe nifty50 --provider rulebased --top 15
     indi-analyst screen --universe nifty50 --preset high-conviction-buys --digest
+
+    indi-analyst backtest RELIANCE                     # walk-forward test of one symbol
+    indi-analyst backtest --universe nifty50 --period 5y --top 20
 """
 
 from __future__ import annotations
@@ -16,6 +19,9 @@ import sys
 
 from indi_analyst.analysis.engine import analyze
 from indi_analyst.analysis.valuation import explain_valuation
+from indi_analyst.backtest import run_backtest
+from indi_analyst.backtest.models import BacktestResult, BacktestStats
+from indi_analyst.config import get_settings
 from indi_analyst.models import Action, Recommendation
 from indi_analyst.screener import (
     resolve_preset,
@@ -196,6 +202,89 @@ def render_scan(result: ScanResult, rows: list, top: int | None) -> str:
     return "\n".join(lines)
 
 
+def _stat_pct(x: float | None) -> str:
+    return _fmt_pct(x) if x is not None else "—"
+
+
+def _stats_line(label: str, s: BacktestStats) -> str:
+    """One aligned row summarizing a BacktestStats block."""
+    return (
+        f"  {label:<14}"
+        f"{s.trades:>6} trades"
+        f"{(f'{s.win_rate * 100:.0f}%' if s.win_rate is not None else '—'):>8} win"
+        f"{(f'{s.expectancy_r:+.2f}R' if s.expectancy_r is not None else '—'):>9} exp"
+        f"{_stat_pct(s.avg_return_pct):>9} avg"
+        f"{(f'{s.profit_factor:.2f}' if s.profit_factor is not None else '—'):>7} pf"
+        f"{_stat_pct(s.max_drawdown):>9} maxDD"
+    )
+
+
+def render_backtest(result: BacktestResult, top: int | None = None) -> str:
+    """A compact report: honesty header, aggregate stats, slices, and per-symbol rows."""
+    s = result.stats
+    lines: list[str] = []
+    lines.append("=" * 88)
+    lines.append(
+        f"BACKTEST: {result.target}   period {result.period}   "
+        f"entry {'/'.join(a.value for a in result.entry_actions)}   "
+        f"warmup {result.warmup_bars}b   max-hold {result.max_hold_bars}b"
+    )
+    lines.append(
+        "technical-signal backtest (fundamentals excluded — point-in-time unavailable from the free source)"
+    )
+    lines.append("=" * 88)
+    lines.append(
+        f"Symbols: {result.ok_symbols}/{result.symbols} ok   "
+        f"Benchmark (mean buy & hold): {_stat_pct(s.buy_hold_return)}"
+    )
+    lines.append("")
+    lines.append("AGGREGATE")
+    lines.append(_stats_line("all", s))
+    if s.trades:
+        lines.append(
+            f"  detail        avg win {_stat_pct(s.avg_win_pct)}   "
+            f"avg loss {_stat_pct(s.avg_loss_pct)}   "
+            f"avg hold {s.avg_bars_held:.0f} bars"
+        )
+    if result.by_action:
+        lines.append("")
+        lines.append("BY ENTRY ACTION")
+        for name, st in result.by_action.items():
+            lines.append(_stats_line(name, st))
+    if result.by_conviction:
+        lines.append("")
+        lines.append("BY CONVICTION")
+        for name, st in result.by_conviction.items():
+            lines.append(_stats_line(name, st))
+
+    per = [r for r in result.per_symbol if r.error is None and r.trades]
+    if per:
+        per = sorted(per, key=lambda r: len(r.trades), reverse=True)
+        shown = per[:top] if top else per
+        lines.append("")
+        lines.append("PER SYMBOL")
+        lines.append(f"  {'SYMBOL':<14}{'TRADES':>7}{'WIN':>7}{'AVG':>9}{'BUY&HOLD':>11}")
+        for r in shown:
+            st = _stats_for_symbol(r.trades)
+            lines.append(
+                f"  {r.symbol:<14}{len(r.trades):>7}"
+                f"{(f'{st.win_rate * 100:.0f}%' if st.win_rate is not None else '—'):>7}"
+                f"{_stat_pct(st.avg_return_pct):>9}"
+                f"{_stat_pct(r.buy_hold_return):>11}"
+            )
+    for w in result.warnings:
+        lines.append(f"! {w}")
+    if not s.trades:
+        lines.append("  (no trades were generated — try a longer --period or a lower warmup)")
+    return "\n".join(lines)
+
+
+def _stats_for_symbol(trades):
+    from indi_analyst.backtest.metrics import compute_stats
+
+    return compute_stats(trades)
+
+
 def _build_filter(args) -> ScreenFilter | None:
     """Assemble a ScreenFilter from CLI flags, starting from a preset if given."""
     flt = resolve_preset(args.preset) if args.preset else ScreenFilter()
@@ -272,8 +361,46 @@ def _cmd_screen(args) -> int:
     return 0
 
 
+def _cmd_backtest(args) -> int:
+    settings = get_settings()
+    if args.period:
+        settings.backtest_history_period = args.period
+    if args.hold:
+        settings.backtest_max_hold_bars = args.hold
+
+    target = args.query or args.universe
+    if not target:
+        print("Provide a symbol (e.g. RELIANCE) or --universe nifty50.", file=sys.stderr)
+        return 2
+
+    def _progress(done: int, total: int, symbol: str) -> None:
+        print(f"\rBacktesting {done}/{total} … {symbol:<16}", end="", file=sys.stderr, flush=True)
+
+    try:
+        result = run_backtest(
+            target,
+            settings=settings,
+            limit=args.limit,
+            on_progress=None if args.format == "json" else _progress,
+        )
+    except Exception as e:
+        print(f"Error backtesting '{target}': {e}", file=sys.stderr)
+        return 1
+    if args.format != "json":
+        print("", file=sys.stderr)  # end the progress line
+
+    if args.format == "json":
+        import json
+
+        print(json.dumps(result.model_dump(mode="json"), indent=2, default=str))
+        return 0
+
+    print(render_backtest(result, top=args.top))
+    return 0
+
+
 # Subcommands whose names are reserved; anything else is treated as an `analyze` query.
-_SUBCOMMANDS = {"analyze", "screen"}
+_SUBCOMMANDS = {"analyze", "screen", "backtest"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -307,6 +434,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_sc.add_argument("--no-cache", action="store_true", help="Bypass the snapshot cache.")
     p_sc.add_argument("--format", choices=["table", "json"], default="table")
     p_sc.set_defaults(func=_cmd_screen, top=15)
+
+    p_bt = sub.add_parser(
+        "backtest",
+        help="Walk-forward test the technical signal + trade levels over history.",
+    )
+    p_bt.add_argument("query", nargs="?", default=None,
+                      help="Single symbol, e.g. RELIANCE. Omit and use --universe for a batch.")
+    p_bt.add_argument("--universe", default=None,
+                      help="nifty50 | nifty200 | nifty500 | watchlist:SYM1,SYM2 | file:/path.csv")
+    p_bt.add_argument("--period", default=None, help="History period, e.g. 3y, 5y, max (default: config).")
+    p_bt.add_argument("--hold", type=int, default=None, help="Max bars to hold a trade (default: config).")
+    p_bt.add_argument("--limit", type=int, default=None, help="Backtest at most N symbols.")
+    p_bt.add_argument("--top", type=int, default=20, help="Show only the top N per-symbol rows (0 = all).")
+    p_bt.add_argument("--format", choices=["table", "json"], default="table")
+    p_bt.set_defaults(func=_cmd_backtest, top=20)
     return parser
 
 

@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     snapshot_cache_ttl_hours: float = 12  # reuse a cached snapshot within this window
     universe_cache_ttl_days: float = 7  # refetch index constituents after this
 
+    # --- Backtesting (walk-forward replay of the deterministic pipeline) ---
+    # Fundamentals/news are NOT point-in-time available from the free source, so the backtest is
+    # deliberately technical-only (no look-ahead). See docs/methodology.md ("Backtesting").
+    backtest_history_period: str = "5y"  # yfinance period fetched per symbol for the replay
+    backtest_warmup_bars: int = 200  # bars required before the first signal (SMA-200 needs them)
+    backtest_max_hold_bars: int = 40  # force an exit at close after this many bars in a trade
+    backtest_entry_actions: str = "BUY,ACCUMULATE"  # quant actions that open a simulated long
+
     def configured_providers(self) -> list[str]:
         """Providers that have what they need to run (key present, etc.)."""
         providers = ["rulebased", "ollama"]  # always available (ollama may still fail to connect)

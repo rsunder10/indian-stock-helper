@@ -190,10 +190,51 @@ unchanged. It's a lightweight signal, not a deep NLP model — see [roadmap.md](
 
 ---
 
+## Backtesting
+
+The backtester replays the **real** deterministic pipeline over history so the signal can be judged
+on evidence rather than intuition. It reuses the exact production functions — no parallel
+re-implementation — which is only sound because the indicators are look-ahead-free: `technical.compute`
+reads only trailing windows and the last bar, so computing it on `df.iloc[: i + 1]` reproduces
+precisely the snapshot an analyst would have had at bar `i`. (A regression test appends future bars and
+asserts the bar-`i` snapshot is unchanged.)
+
+**Technical-only, by design.** The free source only exposes *current* fundamentals and news, so
+backfilling them into history would be look-ahead bias. Each replayed snapshot therefore carries the
+computed technicals, an **empty** `Fundamentals`, and no news sentiment. The composite score's
+fundamental half sits at its neutral 50, so the backtest measures the **technical timing signal**
+(trend / RSI / MACD / ADX / levels) honestly, and never claims to have validated the fundamental score.
+The report header states this explicitly.
+
+**Walk-forward loop** (per symbol):
+
+1. After a warm-up (`BACKTEST_WARMUP_BARS`, default 200 — enough for SMA-200), at each bar `i` build
+   the point-in-time snapshot and run `score`.
+2. If the action is an **entry action** (`BACKTEST_ENTRY_ACTIONS`, default `BUY,ACCUMULATE`) and no
+   position is open, enter a long at **bar `i+1`'s open** — never the signal bar's close, which the
+   decision already used.
+3. Freeze the deterministic `compute_levels` stop and first target. Walk forward: on each bar, a low
+   piercing the stop exits at the stop; otherwise a high reaching the target exits at the target. If a
+   single bar touches **both**, the stop is booked first (conservative — an ambiguous bar is never a
+   win). After `BACKTEST_MAX_HOLD_BARS` (default 40) the trade is closed at that bar's close
+   (`timeout`). Setups whose next open has already gapped through the stop or the target are skipped.
+4. One position at a time; scanning resumes after the exit bar.
+
+**Metrics.** Each trade records its return, R-multiple (reward in units of the entry-to-stop risk),
+bars held, and exit reason. Aggregates: win rate, average win/loss, mean return, **expectancy** (mean
+R), **profit factor** (gross win ÷ gross loss), and the deepest drawdown of the pooled equity curve.
+Everything is read against a **buy-and-hold benchmark** — the mean per-symbol close-to-close return over
+the same window — so an edge is only real if it beats simply holding. Results are also sliced by entry
+action and conviction. It is a bar-resolution model (no intraday path, slippage, or costs), so treat it
+as a relative sanity check on the rules, not a live P&L promise.
+
+---
+
 ## Limitations (read this)
 
 - Yahoo data is **~15 minutes delayed** and fundamentals coverage varies by stock.
 - Swing-based support/resistance is a heuristic, not order-book depth.
-- Scoring weights are sensible defaults, **not** fitted/backtested — backtesting is on the
-  [roadmap](roadmap.md).
+- Scoring weights are sensible defaults, **not** fitted. The `backtest` command (see *Backtesting*
+  above) now measures how the technical signal + levels would have performed, but the shipped weights
+  are not yet tuned to those results.
 - **Not investment advice.** Verify independently before trading.

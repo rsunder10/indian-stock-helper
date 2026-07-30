@@ -208,6 +208,39 @@ preset/min-score, run the scan, browse the ranked table, and drill into any row'
 
 ---
 
+## Backtest (walk-forward)
+
+Ask *"would these signals actually have worked?"*. The `backtest` subcommand replays the **same
+deterministic pipeline** bar by bar over history: at each bar it rebuilds the point-in-time snapshot,
+scores it, and — on a `BUY`/`ACCUMULATE` — simulates a long entered at the **next** bar's open, then
+walks it forward to the stop, the first target, or a max-hold timeout.
+
+```bash
+uv run indi-analyst backtest RELIANCE                       # one symbol
+uv run indi-analyst backtest --universe nifty50 --period 5y --top 20
+uv run indi-analyst backtest --universe watchlist:TCS,INFY --hold 30
+uv run indi-analyst backtest --universe nifty500 --limit 50 --format json
+```
+
+**Technical-only.** The free source only exposes *current* fundamentals/news, so using them
+historically would be look-ahead bias — the backtest deliberately runs on the technical signal alone,
+and the report header says so. It measures timing (trend / RSI / MACD / levels), not the fundamental
+score. See [methodology.md](methodology.md#backtesting) for the full method.
+
+**Flags** — a positional symbol **or** `--universe` (same universes as `screen`); `--period` (e.g.
+`3y`, `5y`, `max`), `--hold` (max bars per trade), `--limit N` (cap symbols), `--top N` (per-symbol
+rows shown, `0` = all), `--format {table,json}`. Warm-up (200 bars) and entry actions
+(`BUY,ACCUMULATE`) come from config (`BACKTEST_WARMUP_BARS`, `BACKTEST_ENTRY_ACTIONS`).
+
+**Output** — aggregate win rate, expectancy (mean R), profit factor, average win/loss, max drawdown,
+and a **buy-and-hold benchmark**, then the same stats sliced by entry action and conviction, plus a
+per-symbol table. Every number is bar-resolution and cost-free, so read it as a relative sanity check
+on the rules, not a live P&L promise.
+
+In code: `from indi_analyst.backtest import run_backtest`.
+
+---
+
 ## As a Python library
 
 The engine returns a plain `Recommendation` pydantic model — ideal for scripts, notebooks, or the

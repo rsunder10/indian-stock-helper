@@ -101,8 +101,12 @@ The next milestone is reliability, not lower latency.
 
 ## 🧭 Phase 4 — Rigor & trust
 
-- **Backtesting the level logic** — measure how entry/stop/target rules would have performed
-  historically; turn scoring weights from sensible defaults into **evidence-tuned** parameters.
+- **Backtesting the level logic** — ✅ *done (initial harness).* A walk-forward backtester
+  (`src/indi_analyst/backtest/`, `indi-analyst backtest`) replays the deterministic pipeline over
+  history and reports win rate, expectancy, R-multiples, profit factor, and a buy-and-hold benchmark.
+  It is technical-only (fundamentals/news are not point-in-time available from the free source). Still
+  open: **using** these results to turn scoring weights from sensible defaults into **evidence-tuned**
+  parameters, plus intraday/slippage/cost modelling.
 - **Configurable strategies** — multiple scoring/level profiles (value, momentum, swing,
   positional) selectable per run.
 - **Explainability & audit** — persist the full snapshot + reasons for every recommendation so
