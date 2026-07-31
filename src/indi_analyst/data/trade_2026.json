@@ -1,0 +1,29 @@
+{
+  "as_of": "2026",
+  "source": "Merchandise exports, Ministry of Commerce (DGCI&S) via https://data.gov.in/ (Open Government Data)",
+  "fetched_at": null,
+  "unit": "% YoY",
+  "value": 2.5,
+  "neutral": 0.0,
+  "note": "SEED pack. `value` is the latest merchandise-export YoY growth (external-demand proxy); refresh from data.gov.in with scripts/refresh_macro.py --kind trade before relying on the magnitude. `neutral` 0 means flat exports map to a zero nudge. `sector_sensitivity` is a maintained crosswalk of export orientation (0..1; NSE-Industry + yfinance) and is never touched by a fetch. tailwind = clamp(((value-neutral)/TRADE_SCALE) * sensitivity, -1, 1). Not investment advice.",
+  "sector_sensitivity": {
+    "Information Technology": 0.9,
+    "Technology": 0.9,
+    "Healthcare": 0.7,
+    "Textiles": 0.8,
+    "Chemicals": 0.7,
+    "Metals & Mining": 0.6,
+    "Basic Materials": 0.6,
+    "Automobile and Auto Components": 0.5,
+    "Capital Goods": 0.4,
+    "Industrials": 0.4,
+    "Consumer Cyclical": 0.3,
+    "Fast Moving Consumer Goods": 0.2,
+    "Consumer Defensive": 0.2,
+    "Financial Services": 0.1,
+    "Realty": 0.0,
+    "Real Estate": 0.0,
+    "Power": 0.0,
+    "Utilities": 0.0
+  }
+}

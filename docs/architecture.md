@@ -101,12 +101,16 @@ breakage on Python 3.13 and keeps the math auditable. See
   government-open-data resolver over a stock's sector and combines their point deltas under one shared
   cap (`resolve_macro_signals` → `list[SectorMacroSignal]`; `macro_score_delta` → the combined capped
   delta `scoring.py` applies). Adding a new dataset = a resolver + pack, registered here.
+  `national_context()` returns the sector-independent macro strip (repo/regime, CPI, every headline).
   - **`budget.py`** — Union-Budget allocation overlay (pack `data/budget_<year>.json`).
   - **`rates.py`** — RBI rate-cycle overlay (pack `data/rates_<version>.json`; easing/tightening ×
     a maintained sector rate-sensitivity crosswalk).
+  - **`overlays.py`** — generic **national-indicator** engine (`OverlaySpec` + `SENSITIVITY_OVERLAYS`):
+    six overlays (IIP, GST, credit, trade/exports, input-cost/WPI, monsoon) as one headline number ×
+    a signed sector-sensitivity crosswalk, packs `data/<kind>_<version>.json`.
   - **`sector_match.py`** — shared case-insensitive exact-then-substring sector matcher (both NSE and
     yfinance taxonomies). All packs are network-free at runtime, refreshed at build time by
-    `scripts/refresh_budget.py` / `scripts/refresh_rates.py`. Missing/unmapped sector → no signal.
+    `scripts/refresh_budget.py` / `refresh_rates.py` / `refresh_macro.py`. Missing/unmapped sector → no signal.
 - **`engine.py`** — the top-level entry point: `analyze(query, provider=...)` runs the whole
   pipeline and returns a `Recommendation`. Also `analyze_snapshot(...)` if you already have one.
 
@@ -145,7 +149,7 @@ replay of the real pipeline over history:
 
 - **`app/dashboard.py`** — Streamlit: ticker input, provider selector, candlestick + RSI/MACD
   charts (Plotly), fundamentals, news, a recommendation card, a per-stock **Macro overlays** panel,
-  and a **Sector tailwinds** table in Screener mode.
+  and a **Sector macro tailwinds** table (plus a national macro strip) in Screener mode.
 - **`cli.py`** — `indi-analyst <ticker> [--provider ...]`, a rich terminal report (incl. a `MACRO
   OVERLAYS` block). Also the quickest way to smoke-test the pipeline. Subcommands `screen` (with an
   optional top-down `--sectors-summary` ranking) and `backtest` reuse the same core.

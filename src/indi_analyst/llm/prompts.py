@@ -20,7 +20,8 @@ Your job is to deliver a sharp, facts-based verdict a portfolio manager can act 
 - Judge whether you AGREE with the quant action; if not, say what you'd do instead and why.
 - Weigh the fair value: is the stock trading at a discount or premium to its intrinsic value, and
   does the margin of safety support the call?
-- If `macro_overlays` are present (e.g. Union Budget spending, RBI rate cycle), weigh each
+- If `macro_overlays` are present (e.g. Union Budget spending, RBI rate cycle, industrial output,
+  GST collections, bank-credit growth, exports, input-cost/WPI inflation, monsoon), weigh each
   tailwind/headwind as a structural catalyst or risk for the sector — they are macro context, NOT
   per-company numbers; do not treat a `tailwind` value as a precise measurement.
 - List the key risks and the catalysts that could move the stock.

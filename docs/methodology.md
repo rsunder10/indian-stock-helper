@@ -201,8 +201,10 @@ policy are flowing. `indi-analyst` folds these into a small, bounded, explainabl
 composite score through a uniform **macro-overlay framework** (`analysis/macro.py`): each source is a
 resolver that maps a stock's sector to a normalized −1..+1 `tailwind` from a **bundled, versioned
 pack**, and the framework combines them under one shared cap. Everything is deterministic and
-computed before any LLM runs. Two overlays ship today (Budget, RBI rate cycle); IIP and forex are
-candidates on the [roadmap](roadmap.md).
+computed before any LLM runs. Eight overlays ship today: two bespoke ones (Union Budget, RBI rate
+cycle) plus six **national-indicator** overlays driven by one generic engine (`analysis/overlays.py`)
+— industrial output (IIP), GST collections, bank-credit growth, merchandise exports, input-cost
+(WPI) inflation, and the monsoon.
 
 **Free-source, offline at runtime.** Every pack lives in `src/indi_analyst/data/` and is refreshed at
 *build time* from free machine-readable sources (the data.gov.in OGD API, RBI MPC decisions) via
@@ -252,6 +254,37 @@ per-source cap = RATE_MAX_POINTS (4)
 So an easing cycle is a tailwind for rate-sensitive sectors and a headwind for none of the
 insensitive ones; a tightening cycle flips the sign. The regime is **derived** from repo vs the
 previous repo, so refreshing just those numbers updates the direction automatically.
+
+### National-indicator overlays (`analysis/overlays.py`)
+
+Six government series share one shape — a single national headline number that helps or hurts a sector
+*in proportion to how exposed the sector is* — so they are driven by one generic engine plus a per-source
+pack `data/<kind>_<version>.json`. Each pack carries the latest headline `value`, a `neutral` baseline
+(the value that maps to a zero nudge), and a maintained signed **sector-sensitivity** crosswalk (both
+taxonomies). The transform generalizes the rate overlay:
+
+```
+strength = clamp( (value − neutral) / <KIND>_SCALE , −1, +1 )
+tailwind = clamp( direction × strength × sector_sensitivity , −1, +1 )
+per-source cap = <KIND>_MAX_POINTS
+```
+
+| Overlay (`kind`) | Series | `direction` | Sensitivity means | Default cap / scale |
+|---|---|---|---|---|
+| `iip` | Index of Industrial Production, YoY | +1 | how cyclical | 2.5 / 4 |
+| `gst` | GST collections, YoY | +1 | consumption exposure | 2.5 / 8 |
+| `credit` | bank-credit growth, YoY | +1 | how credit-driven | 2.0 / 6 |
+| `trade` | merchandise exports, YoY | +1 | export orientation | 2.0 / 12 |
+| `inputcost` | WPI inflation, YoY | **−1** | input-cost sensitivity (signed: producers negative) | 2.0 / 6 |
+| `monsoon` | rainfall vs LPA | +1 | rural-demand exposure | 1.5 / 10 |
+
+`direction = −1` makes rising WPI a **headwind** for input-consuming sectors (auto, durables, FMCG) but
+a **tailwind** for commodity *producers*, which carry a negative sensitivity (metals, energy). Adding a
+new series is one `OverlaySpec` + one pack + five `Settings` fields. These packs ship as **seed** values
+(`fetched_at: null`) — the crosswalks are real maintained config; refresh the headline numbers from the
+free sources with `scripts/refresh_macro.py` before relying on their magnitudes. A sector-independent
+**national strip** (`macro.national_context`) surfaces the current repo/regime, CPI, and every headline
+in the CLI scan, the sector view, and the dashboard.
 
 **Inert in the backtest.** The backtester replays snapshots with an **empty** `Fundamentals` (no
 sector), so no overlay fires and `macro_adjustment` is `0`. This is deliberate and honest: there are

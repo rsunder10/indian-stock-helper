@@ -11,6 +11,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from indi_analyst.analysis.engine import analyze
+from indi_analyst.analysis.macro import national_context
 from indi_analyst.analysis.valuation import explain_valuation
 from indi_analyst.backtest import run_backtest
 from indi_analyst.backtest.models import BacktestResult, BacktestStats
@@ -154,6 +155,9 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
     if s.macro_signals:
         adj = f" · combined score {rec.quant.macro_adjustment:+.1f} pts" if rec.quant.macro_adjustment else ""
         st.markdown(f"**Macro overlays**{adj}")
+        nat = national_context()
+        if nat:
+            st.caption("🏦 Macro backdrop  ·  " + "   ·   ".join(nat))
         for m in s.macro_signals:
             icon = "🟢" if m.tailwind > 0 else "🔴" if m.tailwind < 0 else "⚪"
             st.markdown(f"{icon} **{m.label}** — {m.sector} · tailwind {m.tailwind:+.2f}")
@@ -302,21 +306,28 @@ def _screener_view(settings, provider: str) -> None:
     for w in result.warnings:
         st.warning(w)
 
-    # Top-down: which sectors have the government-budget wind at their back? Built from the full
-    # scanned universe (not the filtered subset), so it answers "which sector" before "which stock".
+    # National macro strip: sector-independent government-data headlines (regime, inflation, activity).
+    nat = national_context()
+    if nat:
+        st.caption("🏦 Macro backdrop  ·  " + "   ·   ".join(nat))
+
+    # Top-down: which sectors have the government wind at their back? Built from the full scanned
+    # universe (not the filtered subset), so it answers "which sector" before "which stock". The
+    # tailwind here is the COMBINED mean across every overlay (budget, rate, IIP, GST, credit, …).
     sectors = summarize_sectors(result.ok_rows())
     if sectors:
-        with st.expander("🏛️ Sector tailwinds (Union Budget)", expanded=True):
-            st.caption("Rank sectors by budget tailwind, then filter to one to find accumulate candidates.")
+        with st.expander("🏛️ Sector macro tailwinds (all government overlays)", expanded=True):
+            st.caption("Rank sectors by combined macro tailwind, then filter to one to find accumulate candidates.")
             st.dataframe(
                 pd.DataFrame([
                     {
                         "Sector": s.sector,
-                        "Budget tailwind": s.budget_tailwind,
+                        "Macro tailwind": s.macro_tailwind,
+                        "Overlays": len(s.overlays),
                         "Avg score": s.avg_score,
                         "Stocks": s.n_stocks,
                         "Top names": ", ".join(sym.replace(".NS", "") for sym in s.top_symbols),
-                        "Budget driver": s.drivers[0] if s.drivers else "—",
+                        "Top driver": s.drivers[0] if s.drivers else "—",
                     }
                     for s in sectors
                 ]),
@@ -335,7 +346,7 @@ def _screener_view(settings, provider: str) -> None:
             "Score": r.score,
             "Tech": r.technical_score,
             "Fund": r.fundamental_score,
-            "Budget": r.budget_tailwind,
+            "Macro": r.macro_points,
             "Close": r.last_close,
             "Fair value": r.fair_value,
             "Upside": r.margin_of_safety,

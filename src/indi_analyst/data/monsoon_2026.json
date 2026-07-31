@@ -1,0 +1,29 @@
+{
+  "as_of": "2026",
+  "source": "IMD seasonal rainfall vs Long Period Average (https://mausam.imd.gov.in/) via https://data.gov.in/",
+  "fetched_at": null,
+  "unit": "% vs LPA",
+  "value": 3.0,
+  "neutral": 0.0,
+  "note": "SEED pack. `value` is the latest cumulative-monsoon departure from the Long Period Average (a rural-demand / agri-input proxy); refresh from IMD/data.gov.in with scripts/refresh_macro.py --kind monsoon before relying on the magnitude. `neutral` 0 means exactly-normal rainfall maps to a zero nudge. `sector_sensitivity` is a maintained crosswalk of rural-demand exposure (0..1; NSE-Industry + yfinance) and is never touched by a fetch. tailwind = clamp(((value-neutral)/MONSOON_SCALE) * sensitivity, -1, 1). Not investment advice.",
+  "sector_sensitivity": {
+    "Fast Moving Consumer Goods": 0.9,
+    "Consumer Defensive": 0.9,
+    "Chemicals": 0.6,
+    "Automobile and Auto Components": 0.6,
+    "Consumer Cyclical": 0.5,
+    "Consumer Durables": 0.5,
+    "Financial Services": 0.4,
+    "Capital Goods": 0.2,
+    "Industrials": 0.2,
+    "Power": 0.3,
+    "Utilities": 0.3,
+    "Metals & Mining": 0.0,
+    "Basic Materials": 0.0,
+    "Information Technology": 0.0,
+    "Technology": 0.0,
+    "Healthcare": 0.1,
+    "Realty": 0.2,
+    "Real Estate": 0.2
+  }
+}

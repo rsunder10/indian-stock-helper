@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
-from indi_analyst.models import Action, Conviction
+from indi_analyst.models import Action, Conviction, SectorMacroSignal
 
 # Bullish -> bearish, for min-conviction / action ordering comparisons.
 _CONVICTION_RANK = {Conviction.LOW: 0, Conviction.MEDIUM: 1, Conviction.HIGH: 2}
@@ -59,6 +59,12 @@ class ScreenRow(BaseModel):
     thesis: list[str] = Field(default_factory=list)
     provider: str | None = None
 
+    # Macro overlays (budget, rate, IIP, GST, credit, trade, input-cost, monsoon). `macro_points` is
+    # the combined, bounded, signed nudge the overlays added to `score`; `macro_signals` carries every
+    # overlay that fired so any screen can show per-source detail. `budget_tailwind`/`budget_drivers`
+    # are kept as a back-compatible convenience over the budget overlay specifically.
+    macro_points: float | None = None  # combined macro nudge in score points (== quant.macro_adjustment)
+    macro_signals: list[SectorMacroSignal] = Field(default_factory=list)  # every overlay that fired
     budget_tailwind: float | None = None  # sector budget tailwind (-1..+1), None if unmapped
     budget_drivers: list[str] = Field(default_factory=list)  # plain-English budget drivers
 
@@ -71,18 +77,22 @@ class ScreenRow(BaseModel):
 
 
 class SectorSummary(BaseModel):
-    """Top-down sector view: the budget tailwind plus how the sector's stocks scored.
+    """Top-down sector view: the combined macro tailwind plus how the sector's stocks scored.
 
     Answers "which sector" before "which stock" — aggregated from the scanned `ScreenRow`s so the
-    budget tailwind (a per-sector constant) sits alongside the bottom-up average score.
+    per-sector macro overlays (a constant across the sector's stocks) sit alongside the bottom-up
+    average score. `macro_tailwind` is the mean of every overlay's tailwind for the sector;
+    `budget_tailwind` is kept as a back-compatible single-source view.
     """
 
     sector: str
+    macro_tailwind: float | None = None  # mean overlay tailwind across all sources, None if unmapped
+    overlays: list[str] = Field(default_factory=list)  # labels of the overlays that fired for the sector
     budget_tailwind: float | None = None  # per-sector constant from the budget pack, None if unmapped
     n_stocks: int = 0
     avg_score: float | None = None
     top_symbols: list[str] = Field(default_factory=list)  # highest-scoring names in the sector
-    drivers: list[str] = Field(default_factory=list)  # budget drivers for the sector
+    drivers: list[str] = Field(default_factory=list)  # one plain-English driver per overlay that fired
 
 
 class ScanResult(BaseModel):
@@ -121,6 +131,7 @@ class ScreenFilter(BaseModel):
     max_pe: float | None = None
     min_rr: float | None = None
     min_upside: float | None = None  # min margin of safety vs fair value (fraction)
+    min_macro_points: float | None = None  # min combined macro nudge in score points (e.g. 0.5)
     trend: str | None = None  # e.g. "uptrend"
 
     def matches(self, row: ScreenRow) -> bool:
@@ -147,6 +158,10 @@ class ScreenFilter(BaseModel):
         if self.min_upside is not None:
             # No fair value (missing fundamentals) fails an upside floor.
             if row.margin_of_safety is None or row.margin_of_safety < self.min_upside:
+                return False
+        if self.min_macro_points is not None:
+            # No macro overlays (e.g. unmapped/sectorless) fails a macro-tailwind floor.
+            if row.macro_points is None or row.macro_points < self.min_macro_points:
                 return False
         if self.trend is not None and (row.trend or "").lower() != self.trend.lower():
             return False

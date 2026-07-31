@@ -229,6 +229,53 @@ def test_summarize_sectors_skips_sectorless_or_scoreless_rows():
     assert [s.sector for s in summaries] == ["Defence"]
 
 
+# --- Sector summary: multi-overlay (all government data) --------------------
+
+def _macro_row(symbol, score, sector, signals):
+    r = _row(symbol, Action.BUY, Conviction.HIGH, score, sector=sector)
+    r.macro_signals = signals
+    r.macro_points = round(sum(s.tailwind for s in signals), 1)
+    r.budget_tailwind = next((s.tailwind for s in signals if s.kind == "budget"), None)
+    return r
+
+
+def test_summarize_sectors_ranks_by_combined_macro_tailwind():
+    from indi_analyst.models import SectorMacroSignal as S
+
+    cg = [S(kind="budget", label="Union Budget", sector="Capital Goods", tailwind=0.6, drivers=["Railways +75%"]),
+          S(kind="iip", label="Industrial output (IIP)", sector="Capital Goods", tailwind=0.2, drivers=["IIP +3.5%"])]
+    it = [S(kind="trade", label="Merchandise exports", sector="IT", tailwind=0.1, drivers=["Exports +2.5%"])]
+    rows = [
+        _macro_row("A.NS", 70, "Capital Goods", cg),
+        _macro_row("B.NS", 60, "Capital Goods", cg),
+        _macro_row("C.NS", 65, "IT", it),
+    ]
+    summaries = summarize_sectors(rows)
+    assert [s.sector for s in summaries] == ["Capital Goods", "IT"]  # ranked by combined tailwind
+
+    cg_sum = summaries[0]
+    assert cg_sum.macro_tailwind == pytest.approx(0.4, abs=0.01)  # mean(0.6, 0.2)
+    assert len(cg_sum.overlays) == 2
+    assert cg_sum.budget_tailwind == 0.6  # budget still extractable
+    assert len(cg_sum.drivers) == 2  # one driver per overlay
+
+
+def test_min_macro_points_filter_and_macro_rank():
+    from indi_analyst.models import SectorMacroSignal as S
+
+    strong = _macro_row("STRONG.NS", 70, "Capital Goods",
+                        [S(kind="budget", label="B", sector="Capital Goods", tailwind=0.8, drivers=["x"])])
+    weak = _macro_row("WEAK.NS", 68, "IT",
+                     [S(kind="trade", label="T", sector="IT", tailwind=0.05, drivers=["y"])])
+    strong.macro_points, weak.macro_points = 4.0, 0.2
+
+    kept = apply([strong, weak], ScreenFilter(min_macro_points=1.0))
+    assert {r.symbol for r in kept} == {"STRONG.NS"}
+
+    ranked = rank([weak, strong], by="macro")
+    assert [r.symbol for r in ranked] == ["STRONG.NS", "WEAK.NS"]
+
+
 # --- Cache round-trip + temporal diff --------------------------------------
 
 def test_snapshot_cache_roundtrip_and_ttl(tmp_path):

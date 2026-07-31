@@ -10,6 +10,7 @@ _RANK_KEYS = {
     "change_pct": lambda r: r.change_pct,
     "technical_score": lambda r: r.technical_score,
     "fundamental_score": lambda r: r.fundamental_score,
+    "macro": lambda r: r.macro_points,
 }
 
 

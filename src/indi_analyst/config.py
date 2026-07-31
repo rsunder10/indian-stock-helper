@@ -73,6 +73,46 @@ class Settings(BaseSettings):
     rate_data_path: str | None = None  # optional override path to a pack JSON; else the bundled one
     rate_max_points: float = 4.0  # per-source cap on the rate-cycle nudge
 
+    # National-indicator overlays (generic "headline number × sector sensitivity" engine, see
+    # analysis/overlays.py; bundled packs data/<kind>_<version>.json; build-time fetch:
+    # scripts/refresh_macro.py). `*_scale` is the (value − neutral) that maps to a full ±1 signal;
+    # `*_max_points` is the per-source cap. All still fold under `macro_max_points`.
+    iip_enabled: bool = True  # Index of Industrial Production (cyclical activity)
+    iip_pack_version: str = "2026"
+    iip_data_path: str | None = None
+    iip_max_points: float = 2.5
+    iip_scale: float = 4.0
+
+    gst_enabled: bool = True  # GST collections (consumption / formalisation)
+    gst_pack_version: str = "2026"
+    gst_data_path: str | None = None
+    gst_max_points: float = 2.5
+    gst_scale: float = 8.0
+
+    credit_enabled: bool = True  # bank credit growth (financing availability)
+    credit_pack_version: str = "2026"
+    credit_data_path: str | None = None
+    credit_max_points: float = 2.0
+    credit_scale: float = 6.0
+
+    trade_enabled: bool = True  # merchandise exports (external demand)
+    trade_pack_version: str = "2026"
+    trade_data_path: str | None = None
+    trade_max_points: float = 2.0
+    trade_scale: float = 12.0
+
+    inputcost_enabled: bool = True  # WPI input-cost inflation (headwind for consumers, tailwind for producers)
+    inputcost_pack_version: str = "2026"
+    inputcost_data_path: str | None = None
+    inputcost_max_points: float = 2.0
+    inputcost_scale: float = 6.0
+
+    monsoon_enabled: bool = True  # IMD rainfall vs LPA (rural demand)
+    monsoon_pack_version: str = "2026"
+    monsoon_data_path: str | None = None
+    monsoon_max_points: float = 1.5
+    monsoon_scale: float = 10.0
+
     # LLM request timeout (seconds)
     llm_timeout: float = 90.0
 

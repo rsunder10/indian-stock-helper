@@ -49,6 +49,8 @@ def _row_from_recommendation(c: Constituent, rec: Recommendation) -> ScreenRow:
         trend=t.trend,
         thesis=list(rec.verdict.thesis[:4]),
         provider=rec.provider,
+        macro_points=rec.quant.macro_adjustment,
+        macro_signals=list(rec.snapshot.macro_signals),
         budget_tailwind=bud.tailwind if bud is not None else None,
         budget_drivers=list(bud.drivers) if bud is not None else [],
     )

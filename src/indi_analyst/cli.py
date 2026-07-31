@@ -18,6 +18,7 @@ import argparse
 import sys
 
 from indi_analyst.analysis.engine import analyze
+from indi_analyst.analysis.macro import national_context
 from indi_analyst.analysis.valuation import explain_valuation
 from indi_analyst.backtest import run_backtest
 from indi_analyst.backtest.models import BacktestResult, BacktestStats
@@ -181,24 +182,28 @@ def render_scan(result: ScanResult, rows: list, top: int | None) -> str:
     """A compact ranked table of scan rows (already filtered/ranked by the caller)."""
     shown = rows[:top] if top else rows
     lines: list[str] = []
-    lines.append("=" * 88)
+    lines.append("=" * 96)
     lines.append(
         f"SCREEN: {result.universe}   provider: {result.provider}   "
         f"scanned {result.ok_count} ok / {result.error_count} err   showing {len(shown)}"
     )
-    lines.append("=" * 88)
+    nat = national_context()
+    if nat:
+        lines.append("MACRO: " + "   ".join(nat))
+    lines.append("=" * 96)
     header = (
-        f"{'#':>2}  {'SYMBOL':<14}{'ACTION':<11}{'CONV':<7}{'SCORE':>6}"
+        f"{'#':>2}  {'SYMBOL':<14}{'ACTION':<11}{'CONV':<7}{'SCORE':>6}{'MACRO':>7}"
         f"{'CLOSE':>11}{'R:R':>6}{'UPSIDE':>8}  SECTOR"
     )
     lines.append(header)
-    lines.append("-" * 88)
+    lines.append("-" * 96)
     for i, r in enumerate(shown, 1):
         lines.append(
             f"{i:>2}  {r.symbol:<14}"
             f"{(r.action.value if r.action else '—'):<11}"
             f"{(r.conviction.value if r.conviction else '—'):<7}"
             f"{(f'{r.score:.0f}' if r.score is not None else '—'):>6}"
+            f"{(f'{r.macro_points:+.1f}' if r.macro_points else '—'):>7}"
             f"{(f'₹{r.last_close:,.0f}' if r.last_close is not None else '—'):>11}"
             f"{(f'{r.risk_reward:.1f}' if r.risk_reward is not None else '—'):>6}"
             f"{(_fmt_pct(r.margin_of_safety) if r.margin_of_safety is not None else '—'):>8}"
@@ -212,20 +217,29 @@ def render_scan(result: ScanResult, rows: list, top: int | None) -> str:
 
 
 def render_sectors(summaries: list, top: int | None = None) -> str:
-    """A top-down sector-tailwind table: which sectors have the government wind at their back."""
+    """A top-down sector macro-tailwind table: which sectors have the government wind at their back.
+
+    `TAILWIND` is the combined mean across every overlay (budget, rate, IIP, GST, credit, trade,
+    input-cost, monsoon); `#OV` is how many of those overlays fired for the sector.
+    """
     shown = summaries[:top] if top else summaries
     lines: list[str] = []
-    lines.append("=" * 88)
-    lines.append("SECTOR TAILWINDS (Union Budget)   — rank sectors, then drill in with --sector")
-    lines.append("=" * 88)
-    lines.append(f"{'#':>2}  {'SECTOR':<28}{'TAILWIND':>9}{'AVG':>7}{'N':>4}  TOP / BUDGET DRIVER")
-    lines.append("-" * 88)
+    lines.append("=" * 96)
+    lines.append("SECTOR MACRO TAILWINDS (budget + rate + IIP/GST/credit/trade/input-cost/monsoon)")
+    nat = national_context()
+    if nat:
+        lines.append("MACRO: " + "   ".join(nat))
+    lines.append("  — rank sectors by combined tailwind, then drill in with --sector")
+    lines.append("=" * 96)
+    lines.append(f"{'#':>2}  {'SECTOR':<28}{'TAILWIND':>9}{'#OV':>5}{'AVG':>7}{'N':>4}  TOP / TOP DRIVER")
+    lines.append("-" * 96)
     for i, s in enumerate(shown, 1):
-        tw = f"{s.budget_tailwind:+.2f}" if s.budget_tailwind is not None else "—"
+        tw = f"{s.macro_tailwind:+.2f}" if s.macro_tailwind is not None else "—"
+        nov = f"{len(s.overlays)}" if s.overlays else "—"
         avg = f"{s.avg_score:.0f}" if s.avg_score is not None else "—"
         tops = ", ".join(sym.replace(".NS", "") for sym in s.top_symbols[:3])
         driver = f"  ·  {s.drivers[0]}" if s.drivers else ""
-        lines.append(f"{i:>2}  {s.sector[:28]:<28}{tw:>9}{avg:>7}{s.n_stocks:>4}  {tops}{driver}")
+        lines.append(f"{i:>2}  {s.sector[:28]:<28}{tw:>9}{nov:>5}{avg:>7}{s.n_stocks:>4}  {tops}{driver}")
     if not shown:
         lines.append("  (no sectors to summarize)")
     return "\n".join(lines)
@@ -469,7 +483,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_sc.add_argument("--sector", default=None, help="Comma list of sector substrings.")
     p_sc.add_argument("--digest", action="store_true", help="Append a top-ideas digest.")
     p_sc.add_argument("--sectors-summary", action="store_true",
-                      help="Prepend a top-down Union-Budget sector-tailwind ranking.")
+                      help="Prepend a top-down macro sector-tailwind ranking (all government overlays).")
     p_sc.add_argument("--no-cache", action="store_true", help="Bypass the snapshot cache.")
     p_sc.add_argument("--format", choices=["table", "json"], default="table")
     p_sc.set_defaults(func=_cmd_screen, top=15)

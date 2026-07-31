@@ -100,8 +100,14 @@ def test_unmapped_sector_scores_inert():
     assert score(snap).macro_adjustment == 0.0
 
 
+_ALL_OVERLAYS_OFF = {
+    "budget_enabled": False, "rate_enabled": False, "iip_enabled": False, "gst_enabled": False,
+    "credit_enabled": False, "trade_enabled": False, "inputcost_enabled": False, "monsoon_enabled": False,
+}
+
+
 def test_disabled_overlays_score_inert():
-    snap = _snap_for_sector("Capital Goods", budget_enabled=False, rate_enabled=False)
+    snap = _snap_for_sector("Capital Goods", **_ALL_OVERLAYS_OFF)
     assert snap.macro_signals == []
     assert score(snap).macro_adjustment == 0.0
 

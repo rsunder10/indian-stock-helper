@@ -126,7 +126,8 @@ In the screener, fair value surfaces as an **UPSIDE** column and a `--min-upside
 When a stock's sector maps to a bundled government-open-data pack, the report adds a `MACRO OVERLAYS`
 block — one line per overlay (its label, the matched sector, a normalized −1..+1 tailwind) plus the
 combined score points added — and the rule-based/LLM narrative gains a matching catalyst per positive
-tailwind (or a risk per negative one). Two overlays ship:
+tailwind (or a risk per negative one). A sector-independent **`MACRO:` strip** (repo rate/regime, CPI,
+and every national headline) also heads the CLI scan and the dashboard. Eight overlays ship:
 
 - **Union Budget** — a sector's budget-capex tailwind, from `data/budget_<year>.json`
   (`BUDGET_ENABLED`, `BUDGET_YEAR`). The shipped `budget_2023-24.json` carries **real figures fetched
@@ -136,10 +137,18 @@ tailwind (or a risk per negative one). Two overlays ship:
 - **RBI rate cycle** — an easing cycle is a tailwind for rate-sensitive sectors (realty, autos,
   NBFCs, capital goods) and a headwind in tightening, from `data/rates_<version>.json`
   (`RATE_ENABLED`, `RATE_PACK_VERSION`).
+- **Six national-indicator overlays** — industrial output **IIP** (cyclicals), **GST** collections
+  (consumption), bank **credit** growth (financials/realty/autos), merchandise **trade**/exports
+  (IT/pharma/textiles), **input-cost**/WPI (a *headwind* for consumers, a *tailwind* for commodity
+  producers), and the **monsoon** (rural/FMCG). Each is one headline number × a sector-sensitivity
+  crosswalk in `data/<kind>_2026.json`, toggled by `<KIND>_ENABLED`. **These ship as seed values**
+  (`fetched_at: null`): the crosswalks are real, but refresh the headline numbers with
+  `scripts/refresh_macro.py` before trusting their magnitudes.
 
-The nudge to the quant score is small and bounded: each overlay has its own cap (`BUDGET_MAX_POINTS`
-5, `RATE_MAX_POINTS` 4) and the **combined** nudge across all overlays is capped by `MACRO_MAX_POINTS`
-(default ±6) — a conviction tiebreaker, not a timing signal, always `0` for an unmapped sector. See
+The nudge to the quant score is small and bounded: each overlay has its own cap (e.g. `BUDGET_MAX_POINTS`
+5, `RATE_MAX_POINTS` 4, `IIP_MAX_POINTS` 2.5, `MONSOON_MAX_POINTS` 1.5) and the **combined** nudge
+across all overlays is capped by `MACRO_MAX_POINTS` (default ±6) — a conviction tiebreaker, not a
+timing signal, always `0` for an unmapped sector. See
 [methodology.md](methodology.md#macro-overlays) for the transforms.
 
 The packs ship with the package and the runtime is fully offline. Refresh them at build time (a free
@@ -155,6 +164,10 @@ uv run python scripts/refresh_budget.py --year 2023-24 \
   --filter-field scheme --filter-value Total          # add --dry-run to preview first
 uv run python scripts/refresh_rates.py --repo-rate 5.75 --prev-repo-rate 6.00 --stance accommodative  # after an MPC
 uv run python scripts/refresh_rates.py --cpi-resource <ogd-resource-id> --field-cpi rate  # refresh CPI
+
+# National-indicator overlays — set a headline number directly, or fetch it from an OGD resource:
+uv run python scripts/refresh_macro.py --kind gst --value 11.2 --as-of 2026-06
+uv run python scripts/refresh_macro.py --kind iip --resource <ogd-resource-id> --field growth_rate
 ```
 
 The refresh only touches the `heads` numbers; the `head_aliases` crosswalk (short head → dataset
@@ -162,9 +175,11 @@ ministry name) and `sector_map` are maintained in the pack, so a feed can never 
 signal. When a newer budget-year dataset appears on data.gov.in, create a `budget_<year>.json` with
 the same crosswalk, point `--resource`/`--field-*` at it, and set `BUDGET_YEAR`.
 
-Top-down, the screener answers *which sector*: `--sectors-summary` prepends a **SECTOR TAILWINDS**
-table (sectors ranked by budget tailwind, with average score and top names), so the workflow is rank
-sectors → drill in with `--sector "<name>"` → pick the accumulate candidates:
+Top-down, the screener answers *which sector*: `--sectors-summary` prepends a **SECTOR MACRO TAILWINDS**
+table (sectors ranked by the *combined* tailwind across all overlays, with the number of overlays that
+fired, average score, and top names), so the workflow is rank sectors → drill in with
+`--sector "<name>"` → pick the accumulate candidates. The scan table's `MACRO` column shows each
+stock's combined macro points, and `min_macro_points` / `rank by="macro"` filter and sort on it:
 
 ```bash
 uv run indi-analyst screen --universe nifty200 --sectors-summary --provider rulebased

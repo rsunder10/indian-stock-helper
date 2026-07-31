@@ -1,0 +1,30 @@
+{
+  "as_of": "2026",
+  "source": "RBI sectoral deployment of bank credit (https://www.rbi.org.in/) + https://data.gov.in/",
+  "fetched_at": null,
+  "unit": "% YoY",
+  "value": 12.5,
+  "neutral": 11.0,
+  "note": "SEED pack. `value` is the latest non-food bank-credit YoY growth (a financing-availability proxy); refresh from RBI/data.gov.in with scripts/refresh_macro.py --kind credit before relying on the magnitude. `neutral` is the long-run nominal-credit-growth baseline mapping to a zero nudge. `sector_sensitivity` is a maintained crosswalk of how credit-driven each sector is (0..1; NSE-Industry + yfinance) and is never touched by a fetch. tailwind = clamp(((value-neutral)/CREDIT_SCALE) * sensitivity, -1, 1). Not investment advice.",
+  "sector_sensitivity": {
+    "Financial Services": 0.9,
+    "Realty": 0.8,
+    "Real Estate": 0.8,
+    "Automobile and Auto Components": 0.7,
+    "Consumer Cyclical": 0.6,
+    "Consumer Durables": 0.6,
+    "Construction": 0.7,
+    "Construction Materials": 0.5,
+    "Capital Goods": 0.5,
+    "Industrials": 0.5,
+    "Power": 0.4,
+    "Utilities": 0.4,
+    "Metals & Mining": 0.3,
+    "Basic Materials": 0.3,
+    "Fast Moving Consumer Goods": 0.2,
+    "Consumer Defensive": 0.2,
+    "Healthcare": 0.1,
+    "Information Technology": 0.1,
+    "Technology": 0.1
+  }
+}
