@@ -27,6 +27,7 @@ from indi_analyst.screener import (
     resolve_preset,
     scan_universe,
     shortlist_digest,
+    summarize_sectors,
 )
 from indi_analyst.screener.filters import apply, rank
 from indi_analyst.screener.models import ScanResult, ScreenFilter
@@ -140,6 +141,14 @@ def render(rec: Recommendation) -> str:
             lines.append(f"  Next results: {s.fundamentals.next_earnings_date:%Y-%m-%d}")
         for cl in ca_lines:
             lines.append(f"  {cl}")
+    if s.macro_signals:
+        lines.append("")
+        adj = f"  (combined score {q.macro_adjustment:+.1f} pts)" if q.macro_adjustment else ""
+        lines.append(f"MACRO OVERLAYS{adj}")
+        for m in s.macro_signals:
+            lines.append(f"  {m.label} · {m.sector} · tailwind {m.tailwind:+.2f}")
+            for d in m.drivers:
+                lines.append(f"    · {d}")
     lines.append("")
     lines.append("THESIS")
     for b in v.thesis:
@@ -199,6 +208,26 @@ def render_scan(result: ScanResult, rows: list, top: int | None) -> str:
         lines.append("  (no rows matched the filter)")
     for w in result.warnings:
         lines.append(f"! {w}")
+    return "\n".join(lines)
+
+
+def render_sectors(summaries: list, top: int | None = None) -> str:
+    """A top-down sector-tailwind table: which sectors have the government wind at their back."""
+    shown = summaries[:top] if top else summaries
+    lines: list[str] = []
+    lines.append("=" * 88)
+    lines.append("SECTOR TAILWINDS (Union Budget)   — rank sectors, then drill in with --sector")
+    lines.append("=" * 88)
+    lines.append(f"{'#':>2}  {'SECTOR':<28}{'TAILWIND':>9}{'AVG':>7}{'N':>4}  TOP / BUDGET DRIVER")
+    lines.append("-" * 88)
+    for i, s in enumerate(shown, 1):
+        tw = f"{s.budget_tailwind:+.2f}" if s.budget_tailwind is not None else "—"
+        avg = f"{s.avg_score:.0f}" if s.avg_score is not None else "—"
+        tops = ", ".join(sym.replace(".NS", "") for sym in s.top_symbols[:3])
+        driver = f"  ·  {s.drivers[0]}" if s.drivers else ""
+        lines.append(f"{i:>2}  {s.sector[:28]:<28}{tw:>9}{avg:>7}{s.n_stocks:>4}  {tops}{driver}")
+    if not shown:
+        lines.append("  (no sectors to summarize)")
     return "\n".join(lines)
 
 
@@ -339,6 +368,9 @@ def _cmd_screen(args) -> int:
     flt = _build_filter(args)
     rows = rank(apply(result.rows, flt), by="score")
 
+    # Top-down sector view is built from the full scanned universe, not the filtered subset.
+    sectors = summarize_sectors(result.ok_rows()) if args.sectors_summary else []
+
     if args.format == "json":
         import json
 
@@ -349,9 +381,14 @@ def _cmd_screen(args) -> int:
             "rows": [r.model_dump(mode="json") for r in (rows[: args.top] if args.top else rows)],
             "warnings": result.warnings,
         }
+        if args.sectors_summary:
+            payload["sectors"] = [s.model_dump(mode="json") for s in sectors]
         print(json.dumps(payload, indent=2, default=str))
         return 0
 
+    if args.sectors_summary:
+        print(render_sectors(sectors))
+        print("")
     print(render_scan(result, rows, args.top))
     if args.digest:
         digest_result = ScanResult(
@@ -431,6 +468,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_sc.add_argument("--action", default=None, help="Comma list, e.g. BUY,ACCUMULATE.")
     p_sc.add_argument("--sector", default=None, help="Comma list of sector substrings.")
     p_sc.add_argument("--digest", action="store_true", help="Append a top-ideas digest.")
+    p_sc.add_argument("--sectors-summary", action="store_true",
+                      help="Prepend a top-down Union-Budget sector-tailwind ranking.")
     p_sc.add_argument("--no-cache", action="store_true", help="Bypass the snapshot cache.")
     p_sc.add_argument("--format", choices=["table", "json"], default="table")
     p_sc.set_defaults(func=_cmd_screen, top=15)

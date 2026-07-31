@@ -65,6 +65,9 @@ class RuleBasedProvider:
                 f"Trades ~{-valuation.margin_of_safety * 100:.0f}% above estimated fair value — "
                 "limited margin of safety."
             )
+        for m in snapshot.macro_signals:
+            if m.tailwind < 0 and m.drivers:
+                risks.append(f"{m.label} headwind for {m.sector}: {m.drivers[0]}.")
         if not risks:
             risks.append("Standard market and execution risk; levels can be invalidated by news.")
 
@@ -73,6 +76,9 @@ class RuleBasedProvider:
             catalysts.append(f"A close above ₹{t.resistances[0]:.0f} would confirm upside continuation.")
         if f.revenue_growth and f.revenue_growth > 0.15:
             catalysts.append("Sustained double-digit revenue growth into the next result.")
+        for m in snapshot.macro_signals:
+            if m.tailwind > 0 and m.drivers:
+                catalysts.append(f"{m.label} tailwind for {m.sector}: {m.drivers[0]}.")
         catalysts.append("Quarterly results, sector rotation, and broad-market direction.")
 
         gist = _ACTION_GIST.get(quant.action, "under review")

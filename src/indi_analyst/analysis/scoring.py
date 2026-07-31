@@ -6,6 +6,8 @@ both the rule-based verdict and the UI). Scores are 0..100; 50 is neutral.
 
 from __future__ import annotations
 
+from indi_analyst.analysis.macro import macro_score_delta
+from indi_analyst.config import get_settings
 from indi_analyst.models import Action, Conviction, QuantScore, StockSnapshot
 
 
@@ -149,6 +151,15 @@ def score(snap: StockSnapshot) -> QuantScore:
     # Technicals drive timing (60%), fundamentals drive conviction (40%).
     composite = 0.6 * tech_score + 0.4 * fund_score
 
+    # Macro overlays (budget, RBI rate cycle, …): a small, bounded, explainable nudge — combined
+    # under a single cap (conviction tiebreaker, not a timing signal). Inert when there are no
+    # signals: the backtest builds snapshots with empty fundamentals (no sector), so nothing fires.
+    macro_reasons: list[str] = []
+    macro_adjustment = 0.0
+    if snap.macro_signals:
+        macro_adjustment, macro_reasons = macro_score_delta(snap.macro_signals, get_settings())
+        composite = max(0.0, min(100.0, composite + macro_adjustment))
+
     if composite >= 68:
         action = Action.BUY
     elif composite >= 57:
@@ -169,5 +180,6 @@ def score(snap: StockSnapshot) -> QuantScore:
         score=round(composite, 1),
         technical_score=round(tech_score, 1),
         fundamental_score=round(fund_score, 1),
-        reasons=tech_reasons + fund_reasons,
+        macro_adjustment=macro_adjustment,
+        reasons=tech_reasons + fund_reasons + macro_reasons,
     )

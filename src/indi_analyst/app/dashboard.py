@@ -18,7 +18,7 @@ from indi_analyst.config import get_settings
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.indicators import technical
 from indi_analyst.models import Action, Recommendation
-from indi_analyst.screener import scan_universe, shortlist_digest
+from indi_analyst.screener import scan_universe, shortlist_digest, summarize_sectors
 from indi_analyst.screener.filters import apply, rank
 from indi_analyst.screener.models import PRESETS, ScanResult, ScreenFilter
 
@@ -151,6 +151,15 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
 
     _recommendation_card(rec)
 
+    if s.macro_signals:
+        adj = f" · combined score {rec.quant.macro_adjustment:+.1f} pts" if rec.quant.macro_adjustment else ""
+        st.markdown(f"**Macro overlays**{adj}")
+        for m in s.macro_signals:
+            icon = "🟢" if m.tailwind > 0 else "🔴" if m.tailwind < 0 else "⚪"
+            st.markdown(f"{icon} **{m.label}** — {m.sector} · tailwind {m.tailwind:+.2f}")
+            if m.drivers:
+                st.caption("  ·  ".join(m.drivers))
+
     left, right = st.columns([2, 1])
     with left:
         st.plotly_chart(_price_chart(df), width="stretch")
@@ -221,6 +230,8 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
             if ca.last_split_ratio and ca.last_split_date is not None:
                 tag = " (recent)" if ca.recent_split else ""
                 rows["Last split"] = f"{ca.last_split_ratio} on {ca.last_split_date.isoformat()}{tag}"
+        for m in s.macro_signals:
+            rows[f"{m.label} tailwind"] = f"{m.tailwind:+.2f} ({m.sector})"
         st.table({k: [("—" if v is None else v)] for k, v in rows.items()})
 
     if s.news:
@@ -291,6 +302,27 @@ def _screener_view(settings, provider: str) -> None:
     for w in result.warnings:
         st.warning(w)
 
+    # Top-down: which sectors have the government-budget wind at their back? Built from the full
+    # scanned universe (not the filtered subset), so it answers "which sector" before "which stock".
+    sectors = summarize_sectors(result.ok_rows())
+    if sectors:
+        with st.expander("🏛️ Sector tailwinds (Union Budget)", expanded=True):
+            st.caption("Rank sectors by budget tailwind, then filter to one to find accumulate candidates.")
+            st.dataframe(
+                pd.DataFrame([
+                    {
+                        "Sector": s.sector,
+                        "Budget tailwind": s.budget_tailwind,
+                        "Avg score": s.avg_score,
+                        "Stocks": s.n_stocks,
+                        "Top names": ", ".join(sym.replace(".NS", "") for sym in s.top_symbols),
+                        "Budget driver": s.drivers[0] if s.drivers else "—",
+                    }
+                    for s in sectors
+                ]),
+                width="stretch", hide_index=True,
+            )
+
     if not rows:
         st.info("No rows matched the filter. Loosen the preset or min-score.")
         return
@@ -303,6 +335,7 @@ def _screener_view(settings, provider: str) -> None:
             "Score": r.score,
             "Tech": r.technical_score,
             "Fund": r.fundamental_score,
+            "Budget": r.budget_tailwind,
             "Close": r.last_close,
             "Fair value": r.fair_value,
             "Upside": r.margin_of_safety,

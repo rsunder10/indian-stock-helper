@@ -121,6 +121,55 @@ knobs `CORPORATE_ACTION_LOOKBACK_YEARS` / `DIVIDEND_MIN_CONSISTENT_YEARS` / `SPL
 In the screener, fair value surfaces as an **UPSIDE** column and a `--min-upside` filter (e.g.
 `--min-upside 0.15` keeps only names trading ≥15% below fair value).
 
+## Macro overlays (government open data)
+
+When a stock's sector maps to a bundled government-open-data pack, the report adds a `MACRO OVERLAYS`
+block — one line per overlay (its label, the matched sector, a normalized −1..+1 tailwind) plus the
+combined score points added — and the rule-based/LLM narrative gains a matching catalyst per positive
+tailwind (or a risk per negative one). Two overlays ship:
+
+- **Union Budget** — a sector's budget-capex tailwind, from `data/budget_<year>.json`
+  (`BUDGET_ENABLED`, `BUDGET_YEAR`). The shipped `budget_2023-24.json` carries **real figures fetched
+  from data.gov.in** (Central-Sector-Scheme BE totals — the latest ministry-wise dataset published
+  there); a `head_aliases` map pins each crosswalk head to the dataset's exact ministry name. Read
+  the YoY as a direction-of-support signal, not a full-outlay figure.
+- **RBI rate cycle** — an easing cycle is a tailwind for rate-sensitive sectors (realty, autos,
+  NBFCs, capital goods) and a headwind in tightening, from `data/rates_<version>.json`
+  (`RATE_ENABLED`, `RATE_PACK_VERSION`).
+
+The nudge to the quant score is small and bounded: each overlay has its own cap (`BUDGET_MAX_POINTS`
+5, `RATE_MAX_POINTS` 4) and the **combined** nudge across all overlays is capped by `MACRO_MAX_POINTS`
+(default ±6) — a conviction tiebreaker, not a timing signal, always `0` for an unmapped sector. See
+[methodology.md](methodology.md#macro-overlays) for the transforms.
+
+The packs ship with the package and the runtime is fully offline. Refresh them at build time (a free
+data.gov.in OGD key in `BUDGET_API_KEY` is shared by both scripts):
+
+```bash
+# Budget heads — the invocation that produced the shipped budget_2023-24.json (Category-wise
+# Central Sector Schemes; --filter-value Total selects the per-ministry total rows):
+uv run python scripts/refresh_budget.py --year 2023-24 \
+  --resource 38772e39-7774-4dca-b8d4-39aa40b60963 \
+  --field-head ministry_department \
+  --field-alloc budget_estimates2023_2024_total --field-prev budget_estimates_2022_2023_total \
+  --filter-field scheme --filter-value Total          # add --dry-run to preview first
+uv run python scripts/refresh_rates.py --repo-rate 5.75 --prev-repo-rate 6.00 --stance accommodative  # after an MPC
+uv run python scripts/refresh_rates.py --cpi-resource <ogd-resource-id> --field-cpi rate  # refresh CPI
+```
+
+The refresh only touches the `heads` numbers; the `head_aliases` crosswalk (short head → dataset
+ministry name) and `sector_map` are maintained in the pack, so a feed can never silently distort the
+signal. When a newer budget-year dataset appears on data.gov.in, create a `budget_<year>.json` with
+the same crosswalk, point `--resource`/`--field-*` at it, and set `BUDGET_YEAR`.
+
+Top-down, the screener answers *which sector*: `--sectors-summary` prepends a **SECTOR TAILWINDS**
+table (sectors ranked by budget tailwind, with average score and top names), so the workflow is rank
+sectors → drill in with `--sector "<name>"` → pick the accumulate candidates:
+
+```bash
+uv run indi-analyst screen --universe nifty200 --sectors-summary --provider rulebased
+```
+
 ---
 
 ## Data-source policy
@@ -182,7 +231,8 @@ uv run python scripts/refresh_universes.py
 `breakout-with-fundamentals`), then narrow further with `--min-score`, `--min-rr`, `--max-pe`,
 `--min-upside` (min margin of safety vs fair value), `--action BUY,ACCUMULATE`,
 `--sector "Information Technology,Energy"`. `--top N` limits rows shown (`--top 0` = all);
-`--limit N` caps how many constituents get scanned.
+`--limit N` caps how many constituents get scanned. `--sectors-summary` prepends a top-down
+budget-tailwind ranking of the scanned sectors (see [Macro overlays](#macro-overlays-government-open-data)).
 
 **Speed & cost** — rule-based is fastest/free and needs no key; a cloud/Ollama provider runs a
 full verdict per stock, so start with `--limit` on the big indices. Snapshots are cached

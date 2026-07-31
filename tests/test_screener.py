@@ -7,7 +7,7 @@ import pytest
 
 from indi_analyst.config import get_settings
 from indi_analyst.models import Action, Conviction, Fundamentals, StockSnapshot, TechnicalSignals
-from indi_analyst.screener import scan_universe
+from indi_analyst.screener import scan_universe, summarize_sectors
 from indi_analyst.screener.cache import ScanCache
 from indi_analyst.screener.filters import apply, rank, resolve_preset
 from indi_analyst.screener.models import Constituent, ScanResult, ScreenFilter, ScreenRow
@@ -192,6 +192,41 @@ def test_preset_resolves_and_narrows():
     ]
     kept = apply(rows, preset)
     assert [r.symbol for r in kept] == ["HI.NS"]
+
+
+# --- Sector summary (top-down budget view) ---------------------------------
+
+def test_summarize_sectors_groups_and_ranks_by_tailwind():
+    rows = [
+        _row("A.NS", Action.BUY, Conviction.HIGH, 70, sector="Defence"),
+        _row("B.NS", Action.HOLD, Conviction.LOW, 50, sector="Defence"),
+        _row("C.NS", Action.ACCUMULATE, Conviction.MEDIUM, 60, sector="IT"),
+        ScreenRow(symbol="ERR.NS", error="boom", sector="Defence"),  # errored -> ignored
+    ]
+    rows[0].budget_tailwind = 0.7  # Defence carries a strong tailwind
+    rows[1].budget_tailwind = 0.7
+    rows[0].budget_drivers = ["Defence outlay +9% YoY"]
+    rows[2].budget_tailwind = 0.1  # IT weaker
+
+    summaries = summarize_sectors(rows)
+    assert [s.sector for s in summaries] == ["Defence", "IT"]  # ranked by tailwind
+
+    defence = summaries[0]
+    assert defence.n_stocks == 2  # errored row excluded
+    assert defence.avg_score == 60.0  # mean(70, 50)
+    assert defence.top_symbols[0] == "A.NS"  # highest-scoring first
+    assert defence.budget_tailwind == 0.7
+    assert defence.drivers == ["Defence outlay +9% YoY"]
+
+
+def test_summarize_sectors_skips_sectorless_or_scoreless_rows():
+    rows = [
+        _row("A.NS", Action.BUY, Conviction.HIGH, 70, sector="Defence"),
+        ScreenRow(symbol="NOSEC.NS", action=Action.BUY, score=80),  # no sector
+        _row("B.NS", Action.HOLD, Conviction.LOW, None, sector="IT"),  # no score
+    ]
+    summaries = summarize_sectors(rows)
+    assert [s.sector for s in summaries] == ["Defence"]
 
 
 # --- Cache round-trip + temporal diff --------------------------------------

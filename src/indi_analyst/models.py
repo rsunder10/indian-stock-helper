@@ -76,6 +76,26 @@ class CorporateActions(BaseModel):
     recent_split: bool | None = None  # split within the recency window of the data as-of date
 
 
+class SectorMacroSignal(BaseModel):
+    """A sector-keyed macro overlay (budget, interest-rate cycle, …). Deterministic, from a pack.
+
+    The general shape behind every government-open-data signal: resolved in `build_snapshot` by
+    matching the stock's sector against a bundled, build-time-refreshed pack, and expressed as a
+    normalized -1..+1 `tailwind` (a macro conviction signal, not a timing signal). The score turns
+    the collected signals into a small, bounded, explainable nudge (see `analysis/macro.py`).
+    Optional per source: an unmapped/None sector or a disabled/absent pack contributes nothing
+    (missing stays missing).
+    """
+
+    kind: str  # source id, e.g. "budget" | "rate"
+    label: str  # human-readable source label, e.g. "Union Budget 2026-27", "RBI rate cycle 2026-06"
+    sector: str  # the sector key that matched (e.g. "Capital Goods")
+    tailwind: float  # normalized -1..+1 (deterministic transform of the pack's numbers)
+    drivers: list[str] = Field(default_factory=list)  # plain-English, e.g. "Defence capex +9.5% YoY"
+    citations: list[str] = Field(default_factory=list)  # source URLs from the pack
+    as_of: str | None = None  # period the pack covers, e.g. "2026-27" (budget year) or "2026-06"
+
+
 class TechnicalSignals(BaseModel):
     """Computed indicators for the latest bar plus trend/level context."""
 
@@ -138,11 +158,17 @@ class StockSnapshot(BaseModel):
 
     fundamentals: Fundamentals = Field(default_factory=Fundamentals)
     corporate_actions: CorporateActions | None = None  # dividend/split history, when the source has it
+    macro_signals: list[SectorMacroSignal] = Field(default_factory=list)  # budget / rate / … sector overlays
     technicals: TechnicalSignals
     news: list[NewsItem] = Field(default_factory=list)
     news_sentiment: float | None = None  # mean VADER compound across headlines
 
     warnings: list[str] = Field(default_factory=list)  # data-quality notes
+
+    @property
+    def budget_signal(self) -> SectorMacroSignal | None:
+        """The budget overlay, if any — a convenience accessor over `macro_signals`."""
+        return next((m for m in self.macro_signals if m.kind == "budget"), None)
 
 
 class TradeLevels(BaseModel):
@@ -199,6 +225,7 @@ class QuantScore(BaseModel):
     score: float  # 0..100
     technical_score: float  # 0..100
     fundamental_score: float  # 0..100
+    macro_adjustment: float = 0.0  # combined points the macro overlays added to the composite (bounded, signed)
     reasons: list[str] = Field(default_factory=list)  # bullet rationale
 
 

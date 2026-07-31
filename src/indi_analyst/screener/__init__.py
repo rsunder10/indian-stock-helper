@@ -15,7 +15,9 @@ from indi_analyst.screener.models import (
     ScanResult,
     ScreenFilter,
     ScreenRow,
+    SectorSummary,
 )
+from indi_analyst.screener.sectors import summarize_sectors
 from indi_analyst.screener.shortlist import shortlist_digest
 from indi_analyst.screener.universe import load_universe
 
@@ -23,6 +25,7 @@ __all__ = [
     "scan_universe",
     "load_universe",
     "shortlist_digest",
+    "summarize_sectors",
     "apply",
     "rank",
     "resolve_preset",
@@ -31,4 +34,5 @@ __all__ = [
     "ScanResult",
     "ScreenFilter",
     "ScreenRow",
+    "SectorSummary",
 ]

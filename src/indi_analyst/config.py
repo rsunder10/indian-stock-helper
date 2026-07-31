@@ -52,6 +52,27 @@ class Settings(BaseSettings):
     dividend_min_consistent_years: int = 3  # min paying years in the window to trust the DDM
     split_recency_days: int = 365  # a split this recent flags recent_split / a snapshot warning
 
+    # --- Macro overlays (sector-keyed government-open-data signals) ---
+    # Small, bounded, explainable nudges to the composite score from bundled, build-time-refreshed
+    # packs (budget, RBI rate cycle, …). The analysis path is fully offline. See
+    # docs/methodology.md ("Macro overlays"). `macro_max_points` caps the COMBINED nudge across all
+    # overlays so they stay small vs. the technical/fundamental core.
+    macro_max_points: float = 6.0  # cap on the combined (signed) nudge across all overlays
+
+    # Budget overlay (bundled Union-Budget pack; build-time fetch: scripts/refresh_budget.py)
+    budget_enabled: bool = True  # master switch for the budget overlay
+    budget_year: str = "2023-24"  # selects the bundled data/budget_<year>.json pack (real data.gov.in data)
+    budget_data_path: str | None = None  # optional override path to a pack JSON; else the bundled one
+    budget_max_points: float = 5.0  # per-source cap on the budget nudge
+    budget_yoy_scale: float = 20.0  # allocation YoY% that maps to a full (+/-1) tailwind
+    budget_api_key: str | None = None  # free data.gov.in OGD key — build-time fetch only (shared)
+
+    # RBI rate-cycle overlay (bundled pack; build-time fetch: scripts/refresh_rates.py)
+    rate_enabled: bool = True  # master switch for the rate-cycle overlay
+    rate_pack_version: str = "2026"  # selects the bundled data/rates_<version>.json pack
+    rate_data_path: str | None = None  # optional override path to a pack JSON; else the bundled one
+    rate_max_points: float = 4.0  # per-source cap on the rate-cycle nudge
+
     # LLM request timeout (seconds)
     llm_timeout: float = 90.0
 

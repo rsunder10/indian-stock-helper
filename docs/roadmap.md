@@ -95,7 +95,18 @@ The next milestone is reliability, not lower latency.
 - **Report export** — one-click **PDF / Markdown** research note per stock (and per screen).
 - **Alerts** — price/level/score-change alerts on watchlists (email/Telegram/desktop).
 - **Portfolio view** — track holdings, aggregate exposure, and per-position level monitoring.
-- **Peer & sector comparison** — side-by-side metrics vs sector peers.
+- **Macro overlays (government open data)** — ✅ *delivered:* a deterministic **macro-overlay
+  framework** (`analysis/macro.py`) folds sector-keyed government open data into a small, bounded,
+  explainable nudge on the quant score (combined under one cap), feeds both the rule-based and LLM
+  narratives, and drives a top-down **sector-ranking view** (`screen --sectors-summary`, dashboard
+  "Sector tailwinds") so you go *which sector → which stock*. Two overlays ship — the **Union Budget**
+  (`analysis/budget.py`) and the **RBI rate cycle** (`analysis/rates.py`). Stays free-source-first:
+  every pack is fetched at **build time** (`scripts/refresh_budget.py`, `scripts/refresh_rates.py`)
+  and bundled, so the analysis path is fully offline — the same reconciliation used for the NSE
+  universe packs. *Next overlays (same framework):* **IIP** sector production momentum and **forex /
+  USDINR** (exporter vs importer). Deliberately **not** doing fragile PDF/tender scraping — it breaks
+  the free-source, no-scraping guarantee.
+- **Peer & sector comparison** — side-by-side metrics vs sector peers (peer-level rows still to come).
 
 ---
 

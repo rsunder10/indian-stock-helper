@@ -59,12 +59,30 @@ class ScreenRow(BaseModel):
     thesis: list[str] = Field(default_factory=list)
     provider: str | None = None
 
+    budget_tailwind: float | None = None  # sector budget tailwind (-1..+1), None if unmapped
+    budget_drivers: list[str] = Field(default_factory=list)  # plain-English budget drivers
+
     error: str | None = None  # set when this symbol failed to scan
     scanned_at: datetime = Field(default_factory=_utcnow)
 
     @property
     def ok(self) -> bool:
         return self.error is None
+
+
+class SectorSummary(BaseModel):
+    """Top-down sector view: the budget tailwind plus how the sector's stocks scored.
+
+    Answers "which sector" before "which stock" — aggregated from the scanned `ScreenRow`s so the
+    budget tailwind (a per-sector constant) sits alongside the bottom-up average score.
+    """
+
+    sector: str
+    budget_tailwind: float | None = None  # per-sector constant from the budget pack, None if unmapped
+    n_stocks: int = 0
+    avg_score: float | None = None
+    top_symbols: list[str] = Field(default_factory=list)  # highest-scoring names in the sector
+    drivers: list[str] = Field(default_factory=list)  # budget drivers for the sector
 
 
 class ScanResult(BaseModel):

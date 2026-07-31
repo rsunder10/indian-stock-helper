@@ -26,6 +26,7 @@ ProgressCb = Callable[[int, int, str], None]
 def _row_from_recommendation(c: Constituent, rec: Recommendation) -> ScreenRow:
     t = rec.snapshot.technicals
     lv = rec.levels
+    bud = rec.snapshot.budget_signal
     return ScreenRow(
         symbol=rec.snapshot.symbol,
         name=rec.snapshot.name or c.name,
@@ -48,6 +49,8 @@ def _row_from_recommendation(c: Constituent, rec: Recommendation) -> ScreenRow:
         trend=t.trend,
         thesis=list(rec.verdict.thesis[:4]),
         provider=rec.provider,
+        budget_tailwind=bud.tailwind if bud is not None else None,
+        budget_drivers=list(bud.drivers) if bud is not None else [],
     )
 
 

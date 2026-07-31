@@ -64,9 +64,13 @@ the thesis).
 
 ```
 composite = 0.60 × technical + 0.40 × fundamental
+composite += macro_adjustment           # bounded ±MACRO_MAX_POINTS, see "Macro overlays"
 ```
 
-Technicals drive **timing** (60%); fundamentals drive **conviction** (40%).
+Technicals drive **timing** (60%); fundamentals drive **conviction** (40%). A small, bounded
+**macro** nudge is then added from government-open-data overlays (Union Budget, RBI rate cycle) —
+see [Macro overlays](#macro-overlays). It is a conviction tiebreaker, not a timing signal, combined
+across all overlays under one cap (default ±6 points), and is `0` whenever no overlay applies.
 
 | Composite | Action |
 | --- | --- |
@@ -187,6 +191,78 @@ mean**: each headline's weight halves every `NEWS_RECENCY_HALFLIFE_DAYS` days (d
 stale headline counts for less than this morning's. Undated headlines get unit weight, and a
 half-life of `0` reduces the aggregate to a plain mean. The ±0.2 thresholds and ±3 score nudge are
 unchanged. It's a lightweight signal, not a deep NLP model — see [roadmap.md](roadmap.md) for more.
+
+---
+
+## Macro overlays
+
+Government open data expresses *sector-level* tailwinds and headwinds — where public money and
+policy are flowing. `indi-analyst` folds these into a small, bounded, explainable nudge on the
+composite score through a uniform **macro-overlay framework** (`analysis/macro.py`): each source is a
+resolver that maps a stock's sector to a normalized −1..+1 `tailwind` from a **bundled, versioned
+pack**, and the framework combines them under one shared cap. Everything is deterministic and
+computed before any LLM runs. Two overlays ship today (Budget, RBI rate cycle); IIP and forex are
+candidates on the [roadmap](roadmap.md).
+
+**Free-source, offline at runtime.** Every pack lives in `src/indi_analyst/data/` and is refreshed at
+*build time* from free machine-readable sources (the data.gov.in OGD API, RBI MPC decisions) via
+`scripts/refresh_*.py` — the analysis path never makes a live call, mirroring the NSE universe packs.
+Each pack's **sector crosswalk** and the transforms below are **maintained config**, not scraped, so
+a raw feed can never silently distort the signal. Sector matching is case-insensitive
+exact-then-substring and each crosswalk carries **both** taxonomies a sector may arrive in — the NSE
+"Industry" strings (bundled universe CSVs) and the coarser yfinance GICS-like sectors. An
+unmapped/`None` sector or a disabled/absent pack contributes **nothing** (missing stays missing).
+
+**Combining → `macro_adjustment`.** Each overlay contributes
+`clamp(tailwind × per-source cap, ±per-source cap)`; the sum is then clamped to `MACRO_MAX_POINTS`
+(default ±6) so the overlays together stay small relative to the technical/fundamental core and keep
+the 50-centred scale — and the action cutoffs (68/57/45/35) — intact. Every contributing point
+appends a human-readable `reasons` line (e.g. *"+5.0 pts — Union Budget 2023-24 sector tailwind:
+Railways outlay +75% YoY"*); `QuantScore.macro_adjustment` exposes the exact combined points.
+
+### Budget overlay (`analysis/budget.py`)
+
+The Union Budget's allocation by head (Defence, Railways, Green energy, Housing, …). Pack
+`data/budget_<year>.json` (selected by `BUDGET_YEAR`; refreshed by `scripts/refresh_budget.py`). For
+the heads a sector maps to:
+
+```
+tailwind = clamp( mean(head YoY%) / BUDGET_YOY_SCALE , −1, +1 )     # BUDGET_YOY_SCALE default 20
+per-source cap = BUDGET_MAX_POINTS (5)
+```
+
+A growing allocation is a structural sector tailwind; every point traces to a published figure. The
+shipped `budget_2023-24.json` holds **real data.gov.in figures** (Central-Sector-Scheme BE totals, the
+latest ministry-wise dataset there); a maintained `head_aliases` map pins each short head to the
+dataset's exact ministry name so the refresh can align them.
+
+### RBI rate-cycle overlay (`analysis/rates.py`)
+
+The rate cycle drives Indian sector rotation. Pack `data/rates_<version>.json` (selected by
+`RATE_PACK_VERSION`; refreshed by `scripts/refresh_rates.py`) carries the repo rate, the previous
+repo rate, MPC stance, CPI, and a maintained **rate-sensitivity** crosswalk (signed magnitude per
+sector — realty/autos/NBFC/capital-goods most sensitive; IT/pharma/defensives ≈ 0).
+
+```
+regime_sign = +1 easing (repo cut)  |  −1 tightening (repo hike)  |  0 neutral (from stance)
+tailwind    = clamp( regime_sign × sector_sensitivity , −1, +1 )
+per-source cap = RATE_MAX_POINTS (4)
+```
+
+So an easing cycle is a tailwind for rate-sensitive sectors and a headwind for none of the
+insensitive ones; a tightening cycle flips the sign. The regime is **derived** from repo vs the
+previous repo, so refreshing just those numbers updates the direction automatically.
+
+**Inert in the backtest.** The backtester replays snapshots with an **empty** `Fundamentals` (no
+sector), so no overlay fires and `macro_adjustment` is `0`. This is deliberate and honest: there are
+no point-in-time historical macro packs, so applying today's tailwind to past bars would be
+look-ahead bias. The backtest therefore measures the technical signal alone, unchanged by this
+feature.
+
+The overlays also feed the **narrative**: the rule-based verdict adds each positive tailwind as a
+catalyst (and each negative one as a headwind risk), and the LLM prompt receives a `macro_overlays`
+block it must treat as macro context, never as per-company numbers. Every parameter is tunable in
+`config.py` / `.env`; each overlay has its own `*_ENABLED` switch.
 
 ---
 

@@ -1,0 +1,141 @@
+{
+  "budget_year": "2023-24",
+  "source": "https://www.data.gov.in/resource/category-wise-expenditure-government-india-under-union-budget-2021-23-2023-24 (OGD resource 38772e39-7774-4dca-b8d4-39aa40b60963, Category-wise Central Sector Schemes, BE 2023-24 vs 2022-23)",
+  "fetched_at": "2026-07-31",
+  "note": "REAL-DATA pack. `heads` allocation/YoY are refreshed from data.gov.in by scripts/refresh_budget.py; `head_aliases` pin each crosswalk head to the dataset's exact ministry-name fragment, and `sector_map` maps a stock's sector (both NSE-Industry and yfinance taxonomies) to those heads. Figures are Central-Sector-Scheme BE totals (a large but partial slice of each ministry's outlay), so read YoY as a direction-of-support signal. Not investment advice.",
+  "head_aliases": {
+    "Defence": [
+      "Capital Outlay on Defence Services"
+    ],
+    "Railways": [
+      "Ministry of Railways"
+    ],
+    "Roads & highways": [
+      "Road Transport and Highways"
+    ],
+    "Green energy": [
+      "New and Renewable Energy"
+    ],
+    "Housing": [
+      "Housing and Urban Affairs"
+    ],
+    "Healthcare": [
+      "Health and Family Welfare"
+    ],
+    "Agriculture & rural": [
+      "Agriculture and Farmers Welfare"
+    ],
+    "Digital & IT": [
+      "Electronics and Information Technology"
+    ],
+    "Manufacturing (PLI)": [
+      "Heavy Industries"
+    ]
+  },
+  "heads": {
+    "Defence": {
+      "alloc_cr": 162600.0,
+      "yoy_pct": 6.7
+    },
+    "Railways": {
+      "alloc_cr": 240000.0,
+      "yoy_pct": 75.1
+    },
+    "Roads & highways": {
+      "alloc_cr": 270250.0,
+      "yoy_pct": 35.8
+    },
+    "Green energy": {
+      "alloc_cr": 9875.0,
+      "yoy_pct": 45.5
+    },
+    "Housing": {
+      "alloc_cr": 26445.0,
+      "yoy_pct": -3.8
+    },
+    "Healthcare": {
+      "alloc_cr": 8820.0,
+      "yoy_pct": -41.8
+    },
+    "Agriculture & rural": {
+      "alloc_cr": 98980.0,
+      "yoy_pct": -6.4
+    },
+    "Digital & IT": {
+      "alloc_cr": 12440.0,
+      "yoy_pct": 16.5
+    },
+    "Manufacturing (PLI)": {
+      "alloc_cr": 6027.0,
+      "yoy_pct": 91.7
+    }
+  },
+  "sector_map": {
+    "Capital Goods": [
+      "Defence",
+      "Railways",
+      "Roads & highways"
+    ],
+    "Construction": [
+      "Roads & highways",
+      "Railways",
+      "Housing"
+    ],
+    "Construction Materials": [
+      "Roads & highways",
+      "Housing"
+    ],
+    "Power": [
+      "Green energy"
+    ],
+    "Realty": [
+      "Housing"
+    ],
+    "Healthcare": [
+      "Healthcare"
+    ],
+    "Metals & Mining": [
+      "Roads & highways",
+      "Railways"
+    ],
+    "Automobile and Auto Components": [
+      "Manufacturing (PLI)"
+    ],
+    "Chemicals": [
+      "Manufacturing (PLI)"
+    ],
+    "Information Technology": [
+      "Digital & IT"
+    ],
+    "Fast Moving Consumer Goods": [
+      "Agriculture & rural"
+    ],
+    "Industrials": [
+      "Defence",
+      "Railways",
+      "Roads & highways"
+    ],
+    "Technology": [
+      "Digital & IT"
+    ],
+    "Communication Services": [
+      "Digital & IT"
+    ],
+    "Basic Materials": [
+      "Roads & highways",
+      "Railways"
+    ],
+    "Utilities": [
+      "Green energy"
+    ],
+    "Real Estate": [
+      "Housing"
+    ],
+    "Consumer Cyclical": [
+      "Manufacturing (PLI)"
+    ],
+    "Consumer Defensive": [
+      "Agriculture & rural"
+    ]
+  }
+}

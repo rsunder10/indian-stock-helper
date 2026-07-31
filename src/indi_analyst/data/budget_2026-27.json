@@ -1,0 +1,39 @@
+{
+  "budget_year": "2026-27",
+  "source": "https://www.indiabudget.gov.in/ (Union Budget documents) via https://openbudgetsindia.org/",
+  "fetched_at": "2026-07-30",
+  "note": "Bundled pack. `heads` allocation/YoY figures are refreshed at build time by scripts/refresh_budget.py from a free machine-readable source; the `sector_map` crosswalk and the tailwind transform are maintained config, not scraped. `sector_map` keys cover BOTH taxonomies a stock's sector may arrive in — the NSE 'Industry' strings used by the bundled universe CSVs, and the coarser yfinance GICS-like sectors — so matching works on either path. Figures below are the bundled baseline and should be re-fetched each budget year. Not investment advice.",
+  "heads": {
+    "Defence": {"alloc_cr": 681210, "yoy_pct": 9.5, "note": "Record capital outlay; domestic-procurement push."},
+    "Railways": {"alloc_cr": 265200, "yoy_pct": 5.8, "note": "Capex-led modernization, new lines and rolling stock."},
+    "Roads & highways": {"alloc_cr": 271000, "yoy_pct": 3.5, "note": "National-highway build-out continues."},
+    "Infrastructure": {"alloc_cr": 1110000, "yoy_pct": 10.1, "note": "Overall effective capital expenditure."},
+    "Green energy": {"alloc_cr": 26500, "yoy_pct": 22.0, "note": "Solar/renewables and PLI for clean-tech."},
+    "Housing": {"alloc_cr": 84671, "yoy_pct": 12.0, "note": "PMAY urban + rural affordable-housing outlay."},
+    "Healthcare": {"alloc_cr": 99000, "yoy_pct": 8.0, "note": "Health-system and insurance-scheme expansion."},
+    "Agriculture & rural": {"alloc_cr": 175000, "yoy_pct": 6.5, "note": "Farm support and rural-demand programmes."},
+    "Manufacturing (PLI)": {"alloc_cr": 21000, "yoy_pct": 15.0, "note": "Production-linked incentives across sectors."},
+    "Digital & IT": {"alloc_cr": 26000, "yoy_pct": 7.0, "note": "Digital-public-infrastructure and IT modernization."}
+  },
+  "sector_map": {
+    "Capital Goods": ["Defence", "Railways", "Infrastructure"],
+    "Construction": ["Infrastructure", "Roads & highways", "Housing"],
+    "Construction Materials": ["Infrastructure", "Housing"],
+    "Power": ["Green energy", "Infrastructure"],
+    "Realty": ["Housing"],
+    "Healthcare": ["Healthcare"],
+    "Metals & Mining": ["Infrastructure"],
+    "Automobile and Auto Components": ["Manufacturing (PLI)"],
+    "Chemicals": ["Manufacturing (PLI)"],
+    "Information Technology": ["Digital & IT"],
+    "Fast Moving Consumer Goods": ["Agriculture & rural"],
+    "Industrials": ["Defence", "Railways", "Infrastructure"],
+    "Technology": ["Digital & IT"],
+    "Communication Services": ["Digital & IT"],
+    "Basic Materials": ["Infrastructure"],
+    "Utilities": ["Green energy", "Infrastructure"],
+    "Real Estate": ["Housing"],
+    "Consumer Cyclical": ["Manufacturing (PLI)"],
+    "Consumer Defensive": ["Agriculture & rural"]
+  }
+}

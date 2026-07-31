@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
+from indi_analyst.analysis.macro import resolve_macro_signals
 from indi_analyst.config import Settings, get_settings
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.datasources.news import GoogleNewsSource, aggregate_sentiment
@@ -44,6 +45,11 @@ def build_snapshot(
 
     technicals = technical.compute(df)
     fundamentals = price_source.fundamentals(symbol)
+
+    # Macro overlays (budget, RBI rate cycle, …): deterministic, from bundled packs — no network.
+    # Keyed on the stock's sector; unmapped/None sectors or disabled/absent packs simply contribute
+    # nothing. The backtest builds snapshots without a sector, so all overlays stay inert there.
+    macro_signals = resolve_macro_signals(fundamentals.sector, settings)
 
     # Corporate actions (dividend/split history) are optional: sources that don't expose them
     # simply leave `corporate_actions` None. `as_of` ties split-recency to the data's freshness
@@ -96,6 +102,7 @@ def build_snapshot(
         technicals=technicals,
         fundamentals=fundamentals,
         corporate_actions=corporate_actions,
+        macro_signals=macro_signals,
         news=news,
         news_sentiment=news_sentiment,
         warnings=warnings,
