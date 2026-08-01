@@ -9,10 +9,11 @@ symbol — one bad ticker never sinks the scan.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from hashlib import sha256
 from typing import Callable
 
 from indi_analyst.analysis.engine import analyze_snapshot
-from indi_analyst.analysis.snapshot import build_snapshot
+from indi_analyst.analysis.snapshot import DEFAULT_NEWS_SOURCE, build_snapshot
 from indi_analyst.config import Settings, get_settings
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.models import Recommendation
@@ -21,6 +22,36 @@ from indi_analyst.screener.models import Constituent, ScanResult, ScreenRow
 from indi_analyst.screener.universe import load_universe
 
 ProgressCb = Callable[[int, int, str], None]
+
+
+def _snapshot_cache_key(settings: Settings, price_source, news_source) -> str:
+    """Hash the inputs that change a cached deterministic snapshot.
+
+    The DB cache is intentionally short-lived, but a symbol alone is not enough: changing the
+    history period, news policy, source adapter, or macro pack must not silently reuse old data.
+    """
+    source_name = f"{type(price_source).__module__}.{type(price_source).__qualname__}"
+    if news_source is DEFAULT_NEWS_SOURCE:
+        news_name = "default-google-news"
+    elif news_source is None:
+        news_name = "news-disabled"
+    else:
+        news_name = f"{type(news_source).__module__}.{type(news_source).__qualname__}"
+    names = [
+        "history_period", "news_max_items", "news_recency_halflife_days",
+        "corporate_action_lookback_years", "dividend_min_consistent_years", "split_recency_days",
+        "budget_enabled", "budget_year", "budget_data_path",
+        "rate_enabled", "rate_pack_version", "rate_data_path",
+        "iip_enabled", "iip_pack_version", "iip_data_path",
+        "gst_enabled", "gst_pack_version", "gst_data_path",
+        "credit_enabled", "credit_pack_version", "credit_data_path",
+        "trade_enabled", "trade_pack_version", "trade_data_path",
+        "inputcost_enabled", "inputcost_pack_version", "inputcost_data_path",
+        "monsoon_enabled", "monsoon_pack_version", "monsoon_data_path",
+    ]
+    material = [source_name, news_name]
+    material.extend(f"{name}={getattr(settings, name)}" for name in names)
+    return sha256("\x1f".join(material).encode("utf-8")).hexdigest()[:20]
 
 
 def _row_from_recommendation(c: Constituent, rec: Recommendation) -> ScreenRow:
@@ -65,12 +96,17 @@ def _scan_one(
     use_cache: bool,
     price_source,
     news_source,
+    snapshot_cache_key: str,
 ) -> ScreenRow:
     """Scan a single constituent. Never raises — failures become an errored row."""
     try:
         snapshot = None
         if use_cache and cache is not None:
-            snapshot = cache.get_snapshot(c.symbol, ttl_hours=settings.snapshot_cache_ttl_hours)
+            snapshot = cache.get_snapshot(
+                c.symbol,
+                ttl_hours=settings.snapshot_cache_ttl_hours,
+                cache_key=snapshot_cache_key,
+            )
         if snapshot is None:
             snapshot = build_snapshot(
                 c.symbol,
@@ -79,7 +115,7 @@ def _scan_one(
                 news_source=news_source,
             )
             if use_cache and cache is not None:
-                cache.put_snapshot(snapshot)
+                cache.put_snapshot(snapshot, cache_key=snapshot_cache_key)
 
         rec = analyze_snapshot(snapshot, provider=provider, settings=settings)
         return _row_from_recommendation(c, rec)
@@ -93,7 +129,7 @@ def scan_universe(
     provider: str | None = None,
     settings: Settings | None = None,
     price_source=None,
-    news_source=None,
+    news_source=DEFAULT_NEWS_SOURCE,
     limit: int | None = None,
     use_cache: bool = True,
     persist: bool = True,
@@ -113,6 +149,7 @@ def scan_universe(
     # (a single RateLimiter instance) instead of each thread constructing its own unthrottled one.
     if price_source is None:
         price_source = build_price_source(settings=settings)
+    snapshot_cache_key = _snapshot_cache_key(settings, price_source, news_source)
 
     if cache is None and (use_cache or persist):
         cache = ScanCache(settings.screener_cache_path)
@@ -139,6 +176,7 @@ def scan_universe(
                 use_cache=use_cache,
                 price_source=price_source,
                 news_source=news_source,
+                snapshot_cache_key=snapshot_cache_key,
             ): c
             for c in members
         }

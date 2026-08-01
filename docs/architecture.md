@@ -162,7 +162,7 @@ replay of the real pipeline over history:
 | --- | --- |
 | `Fundamentals` | P/E, P/B, P/S, ROE, D/E, margins, growth, EPS, book value/sh, dividend rate, next results date, sector… (all optional — free data is patchy) |
 | `CorporateActions` | Free dividend/split history — paying-years count over a lookback window, last dividend, last split ratio/date, `recent_split` flag (optional; `None` when the source has no action history) |
-| `SectorMacroSignal` | A sector-keyed macro overlay (`kind` = budget / rate / …) — normalized −1..+1 `tailwind`, plain-English drivers, source citations, `as_of` (one per firing overlay; none when the sector is unmapped or the pack is absent/disabled) |
+| `SectorMacroSignal` | A sector-keyed macro overlay (`kind` = budget / rate / …) — normalized −1..+1 `tailwind`, plain-English drivers, source citations, `as_of`, and pack `fetched_at` (one per firing overlay; none when the sector is unmapped or the pack is absent/disabled) |
 | `TechnicalSignals` | Latest-bar indicators + trend/level context |
 | `NewsItem` | Headline + VADER sentiment |
 | `StockSnapshot` | **The deterministic source of truth** — everything above, plus `corporate_actions`, `macro_signals` (with a `budget_signal` convenience accessor), warnings, and `data_source` / `data_as_of` provenance |

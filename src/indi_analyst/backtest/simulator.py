@@ -89,7 +89,7 @@ def simulate_symbol(
     i = warmup
     while i < n - 1:  # need bar i+1 to exist for the entry fill
         snap = snapshot_at(df, i, symbol)
-        quant = score(snap)
+        quant = score(snap, settings)
         if quant.action not in entry_actions:
             i += 1
             continue

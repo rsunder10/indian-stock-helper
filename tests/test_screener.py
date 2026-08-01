@@ -103,6 +103,39 @@ def test_scan_uses_snapshot_cache(tmp_path):
     assert source.history_calls == first
 
 
+def test_snapshot_cache_isolated_by_history_settings(tmp_path):
+    settings = _settings(tmp_path)
+    settings.snapshot_cache_ttl_hours = 24
+    cache = ScanCache(settings.screener_cache_path)
+
+    class CountingSource(MockMultiSource):
+        def __init__(self, spec):
+            super().__init__(spec)
+            self.history_calls = 0
+
+        def history(self, symbol, period="1y"):
+            self.history_calls += 1
+            return super().history(symbol, period)
+
+    source = CountingSource({"UP.NS": "up"})
+    scan_universe(
+        "watchlist:UP.NS", provider="rulebased", settings=settings,
+        price_source=source, news_source=None, cache=cache, max_workers=1,
+    )
+    first = source.history_calls
+
+    changed = _settings(tmp_path)
+    changed.snapshot_cache_ttl_hours = 24
+    changed.history_period = "2y"
+    scan_universe(
+        "watchlist:UP.NS", provider="rulebased", settings=changed,
+        price_source=source, news_source=None, cache=cache, max_workers=1,
+    )
+
+    assert first == 1
+    assert source.history_calls == 2
+
+
 def test_load_universe_uses_bundled_data_without_network(tmp_path):
     settings = _settings(tmp_path)
     cache = ScanCache(settings.screener_cache_path)

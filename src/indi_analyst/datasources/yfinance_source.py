@@ -57,6 +57,8 @@ def _corporate_actions(
         min_year = ref.year - lookback_years + 1
         paid_years: set[int] = set()
         for d, v in zip(dates, div_col):
+            if d > ref:
+                continue
             if v and v > 0:
                 if min_year <= d.year <= ref.year:
                     paid_years.add(d.year)
@@ -67,10 +69,11 @@ def _corporate_actions(
     last_split_date = last_split_ratio = recent_split = None
     if split_col is not None:
         for d, v in zip(dates, split_col):
-            if v and v > 0 and v != 1 and (last_split_date is None or d > last_split_date):
+            if d <= ref and v and v > 0 and v != 1 and (last_split_date is None or d > last_split_date):
                 last_split_date, last_split_ratio = d, _split_ratio(float(v))
         if last_split_date is not None:
-            recent_split = (ref - last_split_date).days <= split_recency_days
+            age_days = (ref - last_split_date).days
+            recent_split = 0 <= age_days <= split_recency_days
 
     return CorporateActions(
         dividend_paying_years=dividend_paying_years,
@@ -182,16 +185,42 @@ class YFinanceSource:
 
     def history(self, symbol: str, period: str = "1y") -> pd.DataFrame:
         df = self._history_raw(symbol, period)
-        if df is None or df.empty:
+        if not isinstance(df, pd.DataFrame) or df.empty:
             raise ValueError(
                 f"No price history for '{symbol}'. Check the ticker (try adding .NS or .BO)."
             )
         # Normalize column names, keep only OHLCV.
         df = df.rename(columns=str.title)
+        missing = [c for c in _OHLC if c not in df.columns]
+        if missing:
+            raise ValueError(
+                f"Price history for '{symbol}' is missing required column(s): {', '.join(missing)}."
+            )
         keep = [c for c in ("Open", "High", "Low", "Close", "Volume") if c in df.columns]
-        df = df[keep].dropna(how="all")
+        df = df[keep].dropna(how="all").copy()
 
         warnings: list[str] = []
+
+        # Provider payloads occasionally contain numeric-looking strings or malformed dates.
+        # Coerce at the boundary so the indicator layer receives real numeric/datetime values.
+        for col in keep:
+            raw = df[col]
+            converted = pd.to_numeric(raw, errors="coerce")
+            invalid = raw.notna() & converted.isna()
+            if invalid.any():
+                warnings.append(f"Coerced {int(invalid.sum())} non-numeric {col} value(s) to missing.")
+            df[col] = converted
+
+        try:
+            normalized_index = pd.to_datetime(df.index, errors="coerce")
+            invalid_index = pd.isna(normalized_index)
+            if invalid_index.any():
+                warnings.append(f"Dropped {int(invalid_index.sum())} bar(s) with invalid dates.")
+                df = df.loc[~invalid_index].copy()
+                normalized_index = normalized_index[~invalid_index]
+            df.index = normalized_index
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Price history for '{symbol}' has invalid dates: {exc}") from exc
 
         # Chronological order — indicators assume ascending dates.
         if not df.index.is_monotonic_increasing:
@@ -220,6 +249,12 @@ class YFinanceSource:
             df = df[hi_ok & lo_ok]
             if (dropped := before - len(df)) > 0:
                 warnings.append(f"Dropped {dropped} bar(s) with inconsistent OHLC (High/Low out of range).")
+
+        if "Volume" in df.columns:
+            negative_volume = df["Volume"] < 0
+            if negative_volume.any():
+                df.loc[negative_volume, "Volume"] = float("nan")
+                warnings.append(f"Replaced {int(negative_volume.sum())} negative volume value(s) with missing.")
 
         if df.empty:
             raise ValueError(f"No valid price bars for '{symbol}' after data-quality checks.")

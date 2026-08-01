@@ -106,6 +106,7 @@ def national_context(settings: Settings | None = None) -> list[str]:
             piece = f"RBI repo {float(rp['repo_rate']):.2f}% · {regime}"
             if rp.get("cpi_yoy") is not None:
                 piece += f" · CPI {float(rp['cpi_yoy']):.1f}%"
+            piece += _freshness_suffix(rp)
             lines.append(piece)
 
     for spec in SENSITIVITY_OVERLAYS:
@@ -119,6 +120,12 @@ def national_context(settings: Settings | None = None) -> list[str]:
         except (KeyError, TypeError, ValueError):
             continue
         unit = pack.get("unit", spec.unit)
-        lines.append(f"{spec.label} {value:+.1f}{unit}")
+        lines.append(f"{spec.label} {value:+.1f}{unit}{_freshness_suffix(pack)}")
 
     return lines
+
+
+def _freshness_suffix(pack: dict) -> str:
+    """Make seed/unrefreshed macro values visible in compact UI status lines."""
+    fetched_at = pack.get("fetched_at")
+    return f" · refreshed {fetched_at}" if fetched_at else " · seed/unrefreshed"

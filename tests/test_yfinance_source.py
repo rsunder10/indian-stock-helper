@@ -117,6 +117,45 @@ def test_history_records_source_and_as_of(monkeypatch):
     assert out.attrs["warnings"] == []  # clean data, no notes
 
 
+def test_history_rejects_missing_required_ohlc_columns(monkeypatch):
+    raw = pd.DataFrame(
+        {"Close": [101.0], "Volume": [1000]},
+        index=pd.date_range("2026-01-01", periods=1),
+    )
+
+    class FakeTicker:
+        def history(self, **kwargs):
+            return raw
+
+    _install_ticker(monkeypatch, FakeTicker())
+    with pytest.raises(ValueError, match="missing required column"):
+        yfinance_source.YFinanceSource().history("RELIANCE.NS")
+
+
+def test_history_coerces_malformed_numeric_values(monkeypatch):
+    raw = pd.DataFrame(
+        {
+            "Open": ["100", "bad"],
+            "High": ["102", "103"],
+            "Low": ["99", "100"],
+            "Close": ["101", "102"],
+            "Volume": ["1000", -1],
+        },
+        index=["2026-01-01", "not-a-date"],
+    )
+
+    class FakeTicker:
+        def history(self, **kwargs):
+            return raw
+
+    _install_ticker(monkeypatch, FakeTicker())
+    out = yfinance_source.YFinanceSource().history("RELIANCE.NS")
+
+    assert list(out["Close"]) == [101.0]
+    assert any("non-numeric Open" in warning for warning in out.attrs["warnings"])
+    assert any("invalid dates" in warning for warning in out.attrs["warnings"])
+
+
 def test_history_retries_transient_failure(monkeypatch):
     good = pd.DataFrame(
         {

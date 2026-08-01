@@ -114,4 +114,5 @@ def resolve_rate_signal(
         drivers=[detail],
         citations=[pack["source"]] if pack.get("source") else [],
         as_of=as_of,
+        fetched_at=pack.get("fetched_at"),
     )

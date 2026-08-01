@@ -132,6 +132,9 @@ def serialize(
                 "sector": m.sector,
                 "tailwind": m.tailwind,  # normalized -1..+1 macro signal, not a per-company figure
                 "drivers": m.drivers,
+                "period": m.as_of,
+                "fetched_at": m.fetched_at,
+                "citations": m.citations,
             }
             for m in snapshot.macro_signals
         ]

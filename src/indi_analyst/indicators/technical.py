@@ -133,8 +133,10 @@ def compute(df: pd.DataFrame) -> TechnicalSignals:
 
     supports, resistances = swing_levels(df, last_close)
 
-    golden_cross = (sma_50 is not None and sma_200 is not None) and sma_50 > sma_200
-    above_200sma = (sma_200 is not None) and last_close > sma_200
+    # Preserve unavailable warm-up values as None.  A missing SMA-200 must not become a
+    # false death cross/downtrend, otherwise short histories receive a fabricated bearish signal.
+    golden_cross = None if sma_50 is None or sma_200 is None else sma_50 > sma_200
+    above_200sma = None if sma_200 is None else last_close > sma_200
     if sma_50 is not None and sma_200 is not None:
         if above_200sma and golden_cross:
             trend = "uptrend"
@@ -142,8 +144,10 @@ def compute(df: pd.DataFrame) -> TechnicalSignals:
             trend = "downtrend"
         else:
             trend = "sideways"
+    elif above_200sma is not None:
+        trend = "uptrend" if above_200sma else "downtrend"
     else:
-        trend = "sideways" if above_200sma is None else ("uptrend" if above_200sma else "downtrend")
+        trend = "sideways"
 
     return TechnicalSignals(
         last_close=last_close,
@@ -171,6 +175,6 @@ def compute(df: pd.DataFrame) -> TechnicalSignals:
         supports=supports,
         resistances=resistances,
         trend=trend,
-        golden_cross=golden_cross if sma_200 is not None else None,
-        above_200sma=above_200sma if sma_200 is not None else None,
+        golden_cross=golden_cross,
+        above_200sma=above_200sma,
     )

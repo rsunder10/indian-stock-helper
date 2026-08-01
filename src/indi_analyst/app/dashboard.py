@@ -160,7 +160,10 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
             st.caption("🏦 Macro backdrop  ·  " + "   ·   ".join(nat))
         for m in s.macro_signals:
             icon = "🟢" if m.tailwind > 0 else "🔴" if m.tailwind < 0 else "⚪"
-            st.markdown(f"{icon} **{m.label}** — {m.sector} · tailwind {m.tailwind:+.2f}")
+            freshness = f"refreshed {m.fetched_at}" if m.fetched_at else "seed/unrefreshed"
+            st.markdown(
+                f"{icon} **{m.label}** — {m.sector} · tailwind {m.tailwind:+.2f} · {freshness}"
+            )
             if m.drivers:
                 st.caption("  ·  ".join(m.drivers))
 

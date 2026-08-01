@@ -2,7 +2,7 @@
 
 `indi-analyst` is provider-agnostic. The deterministic engine produces the snapshot, levels, and
 score; a provider only writes the **analyst verdict** (thesis, risks, catalysts, summary) over
-that snapshot. Every provider implements one method — `verdict(snapshot, levels, quant) ->
+that snapshot. Every provider implements one method — `verdict(snapshot, levels, quant, valuation) ->
 AnalystVerdict` — so they're fully interchangeable.
 
 If the selected provider can't be built (missing package, no key) or fails at request time, the
@@ -124,12 +124,17 @@ Loaded by `config.py` via pydantic-settings; environment variables override `.en
 | `YF_RETRY_BACKOFF` | `0.5` | Base seconds for exponential backoff between retries |
 | `YF_MIN_REQUEST_INTERVAL` | `0.15` | Min seconds between yfinance calls (0 = no throttle) |
 
+Macro-pack settings are also available through `.env`: `BUDGET_YEAR` (default `2026-27`),
+`RATE_PACK_VERSION`, and the six `<KIND>_PACK_VERSION` / `<KIND>_ENABLED` pairs. The bundled
+national-indicator packs are seed values until refreshed with `scripts/refresh_macro.py`; their
+CLI/dashboard status and snapshot warnings expose that state.
+
 ---
 
 ## Adding a new provider
 
 1. Create `src/indi_analyst/llm/<name>_provider.py` with a class exposing `name` and
-   `verdict(self, snapshot, levels, quant) -> AnalystVerdict`.
+   `verdict(self, snapshot, levels, quant, valuation) -> AnalystVerdict`.
 2. Reuse `prompts.SYSTEM_PROMPT` + `prompts.serialize(...)` for the request, and
    `parsing.parse_verdict(...)` to validate the model's JSON.
 3. Register it in `llm/factory.py` (and add any key to `config.py` +

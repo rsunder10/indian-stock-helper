@@ -147,7 +147,10 @@ def render(rec: Recommendation) -> str:
         adj = f"  (combined score {q.macro_adjustment:+.1f} pts)" if q.macro_adjustment else ""
         lines.append(f"MACRO OVERLAYS{adj}")
         for m in s.macro_signals:
-            lines.append(f"  {m.label} · {m.sector} · tailwind {m.tailwind:+.2f}")
+            freshness = f"refreshed {m.fetched_at}" if m.fetched_at else "seed/unrefreshed"
+            lines.append(
+                f"  {m.label} · {m.sector} · tailwind {m.tailwind:+.2f} · {freshness}"
+            )
             for d in m.drivers:
                 lines.append(f"    · {d}")
     lines.append("")

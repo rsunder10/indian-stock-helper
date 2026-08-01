@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from indi_analyst.analysis.engine import analyze
 from indi_analyst.analysis.snapshot import build_snapshot
+from indi_analyst.analysis import snapshot as snapshot_module
 from indi_analyst.config import Settings
 from indi_analyst.models import Action, Conviction, Recommendation
 from tests.conftest import MockPriceSource, make_ohlcv
@@ -71,3 +72,35 @@ def test_snapshot_without_attrs_still_builds():
     )
     assert snap.data_source is None
     assert snap.data_as_of is None
+
+
+def test_explicit_none_news_source_skips_live_news(monkeypatch):
+    def fail_if_constructed():
+        raise AssertionError("default news source should not be constructed")
+
+    monkeypatch.setattr(snapshot_module, "GoogleNewsSource", fail_if_constructed)
+    snap = build_snapshot(
+        "TEST",
+        settings=Settings(default_llm_provider="rulebased"),
+        price_source=MockPriceSource(make_ohlcv("up", n=300)),
+        news_source=None,
+    )
+
+    assert snap.news == []
+    assert snap.news_sentiment is None
+
+
+def test_news_failure_degrades_to_a_warning():
+    class BrokenNews:
+        def news(self, name_or_symbol, max_items):
+            raise RuntimeError("news service unavailable")
+
+    snap = build_snapshot(
+        "TEST",
+        settings=Settings(default_llm_provider="rulebased"),
+        price_source=MockPriceSource(make_ohlcv("up", n=300)),
+        news_source=BrokenNews(),
+    )
+
+    assert snap.news == []
+    assert any("News unavailable" in warning for warning in snap.warnings)

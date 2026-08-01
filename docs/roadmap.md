@@ -84,6 +84,10 @@ The next milestone is reliability, not lower latency.
   duplicate-headline collapsing, returned freshest-first, with a **recency-weighted** aggregate
   sentiment (weight halves every `NEWS_RECENCY_HALFLIFE_DAYS`) — still the no-key Google News RSS
   baseline.
+- ✅ **Freshness and failure visibility** — explicit `news_source=None` offline mode, graceful news
+  and fundamentals degradation, honest short-history indicator warm-up values, macro pack
+  `as_of`/`fetched_at` status in CLI/dashboard/JSON, and snapshot-cache keys isolated by source and
+  material settings.
 
 ---
 

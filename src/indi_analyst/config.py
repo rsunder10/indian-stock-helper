@@ -61,7 +61,7 @@ class Settings(BaseSettings):
 
     # Budget overlay (bundled Union-Budget pack; build-time fetch: scripts/refresh_budget.py)
     budget_enabled: bool = True  # master switch for the budget overlay
-    budget_year: str = "2023-24"  # selects the bundled data/budget_<year>.json pack (real data.gov.in data)
+    budget_year: str = "2026-27"  # selects the latest bundled data/budget_<year>.json pack
     budget_data_path: str | None = None  # optional override path to a pack JSON; else the bundled one
     budget_max_points: float = 5.0  # per-source cap on the budget nudge
     budget_yoy_scale: float = 20.0  # allocation YoY% that maps to a full (+/-1) tailwind

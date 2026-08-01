@@ -40,6 +40,12 @@ def test_capital_goods_gets_budget_and_rate():
     assert "budget" in kinds and "rate" in kinds
 
 
+def test_seed_macro_pack_status_is_visible_on_snapshot():
+    snap = _snap_for_sector("Capital Goods")
+    assert any(signal.fetched_at is None for signal in snap.macro_signals)
+    assert any("unrefreshed seed data" in warning for warning in snap.warnings)
+
+
 def test_unmapped_sector_yields_no_signals():
     assert resolve_macro_signals("Testing", _settings()) == []
 

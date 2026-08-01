@@ -130,10 +130,11 @@ tailwind (or a risk per negative one). A sector-independent **`MACRO:` strip** (
 and every national headline) also heads the CLI scan and the dashboard. Eight overlays ship:
 
 - **Union Budget** — a sector's budget-capex tailwind, from `data/budget_<year>.json`
-  (`BUDGET_ENABLED`, `BUDGET_YEAR`). The shipped `budget_2023-24.json` carries **real figures fetched
-  from data.gov.in** (Central-Sector-Scheme BE totals — the latest ministry-wise dataset published
-  there); a `head_aliases` map pins each crosswalk head to the dataset's exact ministry name. Read
-  the YoY as a direction-of-support signal, not a full-outlay figure.
+  (`BUDGET_ENABLED`, `BUDGET_YEAR`; the default is the latest bundled `2026-27` pack). The shipped
+  `budget_2023-24.json` carries **real figures fetched from data.gov.in** (Central-Sector-Scheme BE
+  totals — the latest ministry-wise dataset published there); a `head_aliases` map pins each
+  crosswalk head to the dataset's exact ministry name. Read the YoY as a direction-of-support
+  signal, not a full-outlay figure.
 - **RBI rate cycle** — an easing cycle is a tailwind for rate-sensitive sectors (realty, autos,
   NBFCs, capital goods) and a headwind in tightening, from `data/rates_<version>.json`
   (`RATE_ENABLED`, `RATE_PACK_VERSION`).
@@ -143,7 +144,9 @@ and every national headline) also heads the CLI scan and the dashboard. Eight ov
   producers), and the **monsoon** (rural/FMCG). Each is one headline number × a sector-sensitivity
   crosswalk in `data/<kind>_2026.json`, toggled by `<KIND>_ENABLED`. **These ship as seed values**
   (`fetched_at: null`): the crosswalks are real, but refresh the headline numbers with
-  `scripts/refresh_macro.py` before trusting their magnitudes.
+  `scripts/refresh_macro.py` before trusting their magnitudes. The CLI, dashboard, snapshot
+  warnings, and JSON output mark an overlay as `seed/unrefreshed` until that refresh timestamp is
+  present.
 
 The nudge to the quant score is small and bounded: each overlay has its own cap (e.g. `BUDGET_MAX_POINTS`
 5, `RATE_MAX_POINTS` 4, `IIP_MAX_POINTS` 2.5, `MONSOON_MAX_POINTS` 1.5) and the **combined** nudge
@@ -208,6 +211,14 @@ Every analysis also records its **provenance**: the CLI header prints a `Data: y
 <date>` line (`data_source` / `data_as_of` on the snapshot), where the date is the latest price bar —
 so you always know the source and how fresh the data is.
 
+News is optional and injectable. Omitting `news_source` uses Google News RSS; passing
+`news_source=None` explicitly disables all news calls, which is useful for offline runs and tests.
+If an injected or live news source fails, the analysis keeps the deterministic price/fundamental
+result and adds a visible `News unavailable` warning. A news failure never fabricates sentiment.
+
+Macro signals carry both the period they describe (`as_of`) and the pack refresh date
+(`fetched_at`). A missing refresh date means the bundled value is a seed, not a current reading.
+
 **Rate & retry discipline** — free endpoints have no SLA, so each yfinance call is retried with
 exponential backoff on a transient failure, and calls are paced by a minimum interval (a single
 shared limiter across a screener scan's worker threads, so a scan doesn't hammer the endpoint). Tune
@@ -251,7 +262,10 @@ budget-tailwind ranking of the scanned sectors (see [Macro overlays](#macro-over
 
 **Speed & cost** — rule-based is fastest/free and needs no key; a cloud/Ollama provider runs a
 full verdict per stock, so start with `--limit` on the big indices. Snapshots are cached
-(`snapshot_cache_ttl_hours`), so re-scanning a universe is markedly faster the second time.
+(`snapshot_cache_ttl_hours`), so re-scanning a universe is markedly faster the second time. Cache
+entries are isolated by source adapter, history period, news policy, corporate-action settings,
+and macro-pack configuration; changing those inputs forces a fresh snapshot instead of reusing a
+symbol-only result.
 
 **Offline** — scans use cached constituents, the bundled NIFTY 50 list, an inline watchlist, or a
 local CSV. No live exchange request is needed to discover symbols.
@@ -366,7 +380,7 @@ rec = analyze(
 from indi_analyst.analysis.snapshot import build_snapshot
 from indi_analyst.analysis.engine import analyze_snapshot
 
-snap = build_snapshot("HDFCBANK")           # deterministic: data + indicators only
+snap = build_snapshot("HDFCBANK")           # source data + deterministic indicators
 rec = analyze_snapshot(snap, provider="ollama")
 ```
 

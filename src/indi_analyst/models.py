@@ -94,6 +94,7 @@ class SectorMacroSignal(BaseModel):
     drivers: list[str] = Field(default_factory=list)  # plain-English, e.g. "Defence capex +9.5% YoY"
     citations: list[str] = Field(default_factory=list)  # source URLs from the pack
     as_of: str | None = None  # period the pack covers, e.g. "2026-27" (budget year) or "2026-06"
+    fetched_at: str | None = None  # pack refresh date; None means the bundled value is unrefreshed/seed data
 
 
 class TechnicalSignals(BaseModel):

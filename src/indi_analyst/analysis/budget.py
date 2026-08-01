@@ -118,4 +118,5 @@ def resolve_budget_signal(
         drivers=drivers,
         citations=citations,
         as_of=budget_year,
+        fetched_at=pack.get("fetched_at"),
     )

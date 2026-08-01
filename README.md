@@ -123,9 +123,9 @@ src/indi_analyst/
 
 ## Roadmap (short version)
 
-- **Next:** free-source hardening — reliable delayed/EOD data, quality checks, caching, and local
-  universe packs.
-- Report export (PDF/Markdown), watchlists & alerts, and data freshness metadata.
+- **Current focus:** keep government-open-data packs refreshed and clearly label their period and
+  freshness in every analysis.
+- Next: report export (PDF/Markdown), watchlists & alerts, and richer peer/comparative context.
 - Backtesting, FastAPI + JS frontend, and carefully evaluated optional free-tier adapters.
 
 Full plan with milestones in **[docs/roadmap.md](docs/roadmap.md)**.

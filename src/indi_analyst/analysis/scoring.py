@@ -7,7 +7,7 @@ both the rule-based verdict and the UI). Scores are 0..100; 50 is neutral.
 from __future__ import annotations
 
 from indi_analyst.analysis.macro import macro_score_delta
-from indi_analyst.config import get_settings
+from indi_analyst.config import Settings, get_settings
 from indi_analyst.models import Action, Conviction, QuantScore, StockSnapshot
 
 
@@ -53,12 +53,14 @@ def _technical_score(snap: StockSnapshot) -> tuple[float, list[str]]:
 
     # ADX trend strength (only meaningful in combination with direction)
     if t.adx_14 is not None and t.adx_14 > 25:
-        if t.above_200sma:
+        if t.above_200sma is True:
             score += 4
             reasons.append(f"ADX {t.adx_14:.0f} — strong, trending market (with the uptrend).")
-        else:
+        elif t.above_200sma is False:
             score -= 4
             reasons.append(f"ADX {t.adx_14:.0f} — strong trend, but pointing down.")
+        else:
+            reasons.append(f"ADX {t.adx_14:.0f} — strong trend; long-term direction unavailable.")
 
     # 52-week position
     if t.week52_position is not None:
@@ -144,7 +146,9 @@ def _fundamental_score(snap: StockSnapshot) -> tuple[float, list[str]]:
     return max(0.0, min(100.0, score)), reasons
 
 
-def score(snap: StockSnapshot) -> QuantScore:
+def score(snap: StockSnapshot, settings: Settings | None = None) -> QuantScore:
+    """Score a snapshot using the supplied settings for macro caps and switches."""
+    settings = settings or get_settings()
     tech_score, tech_reasons = _technical_score(snap)
     fund_score, fund_reasons = _fundamental_score(snap)
 
@@ -157,7 +161,7 @@ def score(snap: StockSnapshot) -> QuantScore:
     macro_reasons: list[str] = []
     macro_adjustment = 0.0
     if snap.macro_signals:
-        macro_adjustment, macro_reasons = macro_score_delta(snap.macro_signals, get_settings())
+        macro_adjustment, macro_reasons = macro_score_delta(snap.macro_signals, settings)
         composite = max(0.0, min(100.0, composite + macro_adjustment))
 
     if composite >= 68:

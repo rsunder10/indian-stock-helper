@@ -79,10 +79,19 @@ class ScanCache:
             )
 
     # --- Snapshot cache -------------------------------------------------
-    def get_snapshot(self, symbol: str, ttl_hours: float) -> StockSnapshot | None:
+    @staticmethod
+    def _snapshot_key(symbol: str, cache_key: str | None) -> str:
+        # Keep the public symbol separate from the context used to avoid reusing a snapshot
+        # produced by a different source, history window, or macro/news configuration.
+        return f"{symbol}::{cache_key}" if cache_key else symbol
+
+    def get_snapshot(
+        self, symbol: str, ttl_hours: float, *, cache_key: str | None = None
+    ) -> StockSnapshot | None:
+        storage_key = self._snapshot_key(symbol, cache_key)
         with self._lock, self._connect() as conn:
             row = conn.execute(
-                "SELECT as_of, json FROM snapshots WHERE symbol = ?", (symbol,)
+                "SELECT as_of, json FROM snapshots WHERE symbol = ?", (storage_key,)
             ).fetchone()
         if not row:
             return None
@@ -94,11 +103,12 @@ class ScanCache:
         except Exception:
             return None
 
-    def put_snapshot(self, snapshot: StockSnapshot) -> None:
+    def put_snapshot(self, snapshot: StockSnapshot, *, cache_key: str | None = None) -> None:
+        storage_key = self._snapshot_key(snapshot.symbol, cache_key)
         with self._lock, self._connect() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO snapshots (symbol, as_of, json) VALUES (?, ?, ?)",
-                (snapshot.symbol, _now().isoformat(), snapshot.model_dump_json()),
+                (storage_key, _now().isoformat(), snapshot.model_dump_json()),
             )
 
     # --- Constituent cache ----------------------------------------------

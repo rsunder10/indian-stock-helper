@@ -282,7 +282,9 @@ per-source cap = <KIND>_MAX_POINTS
 a **tailwind** for commodity *producers*, which carry a negative sensitivity (metals, energy). Adding a
 new series is one `OverlaySpec` + one pack + five `Settings` fields. These packs ship as **seed** values
 (`fetched_at: null`) — the crosswalks are real maintained config; refresh the headline numbers from the
-free sources with `scripts/refresh_macro.py` before relying on their magnitudes. A sector-independent
+free sources with `scripts/refresh_macro.py` before relying on their magnitudes. Each resolved signal
+also carries the period it describes (`as_of`) and the pack refresh date (`fetched_at`); missing
+refresh dates are shown as `seed/unrefreshed` and raise a snapshot warning. A sector-independent
 **national strip** (`macro.national_context`) surfaces the current repo/regime, CPI, and every headline
 in the CLI scan, the sector view, and the dashboard.
 

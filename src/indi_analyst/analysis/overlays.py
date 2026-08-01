@@ -175,4 +175,5 @@ def resolve_overlay_signal(
         drivers=[driver],
         citations=[pack["source"]] if pack.get("source") else [],
         as_of=as_of,
+        fetched_at=pack.get("fetched_at"),
     )

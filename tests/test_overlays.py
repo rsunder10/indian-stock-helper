@@ -92,6 +92,7 @@ def test_national_context_lists_rate_and_every_enabled_overlay():
     assert any("RBI repo" in ln for ln in lines)
     for spec in SENSITIVITY_OVERLAYS:
         assert any(spec.label in ln for ln in lines), f"{spec.kind} missing from national strip"
+    assert any("seed/unrefreshed" in ln for ln in lines)
 
 
 def test_national_context_skips_disabled_overlay():

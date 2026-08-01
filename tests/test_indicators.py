@@ -54,3 +54,12 @@ def test_supports_below_resistances_above():
         assert s < sig.last_close
     for r in sig.resistances:
         assert r > sig.last_close
+
+
+def test_short_history_preserves_unavailable_long_term_context():
+    sig = technical.compute(make_ohlcv("up", n=60))
+
+    assert sig.sma_200 is None
+    assert sig.above_200sma is None
+    assert sig.golden_cross is None
+    assert sig.trend == "sideways"

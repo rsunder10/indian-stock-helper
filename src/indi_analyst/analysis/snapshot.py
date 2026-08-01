@@ -11,7 +11,9 @@ from indi_analyst.config import Settings, get_settings
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.datasources.news import GoogleNewsSource, aggregate_sentiment
 from indi_analyst.indicators import technical
-from indi_analyst.models import StockSnapshot
+from indi_analyst.models import Fundamentals, StockSnapshot
+
+DEFAULT_NEWS_SOURCE = object()
 
 
 def build_snapshot(
@@ -19,12 +21,13 @@ def build_snapshot(
     *,
     settings: Settings | None = None,
     price_source=None,
-    news_source=None,
+    news_source=DEFAULT_NEWS_SOURCE,
 ) -> StockSnapshot:
     """Resolve a query to a full snapshot. Sources are injectable for testing."""
     settings = settings or get_settings()
     price_source = price_source or build_price_source(settings=settings)
-    news_source = news_source if news_source is not None else GoogleNewsSource()
+    if news_source is DEFAULT_NEWS_SOURCE:
+        news_source = GoogleNewsSource()
 
     warnings: list[str] = []
 
@@ -44,7 +47,16 @@ def build_snapshot(
         )
 
     technicals = technical.compute(df)
-    fundamentals = price_source.fundamentals(symbol)
+    get_fundamentals = getattr(price_source, "fundamentals", None)
+    if callable(get_fundamentals):
+        try:
+            fundamentals = get_fundamentals(symbol)
+        except Exception as exc:  # source-specific failure; preserve technical analysis
+            fundamentals = Fundamentals()
+            warnings.append(f"Fundamentals unavailable: {exc}")
+    else:
+        fundamentals = Fundamentals()
+        warnings.append("Fundamentals unavailable — the price source has no fundamentals adapter.")
 
     # Macro overlays (budget, RBI rate cycle, …): deterministic, from bundled packs — no network.
     # Keyed on the stock's sector; unmapped/None sectors or disabled/absent packs simply contribute
@@ -77,22 +89,33 @@ def build_snapshot(
 
     news = []
     news_sentiment = None
-    if news_source is not None:
-        news = news_source.news(name or symbol, max_items=settings.news_max_items)
-        news_sentiment = aggregate_sentiment(
-            news, halflife_days=settings.news_recency_halflife_days
-        )
-        if len(news) < 3:
-            warnings.append(f"Thin news coverage — only {len(news)} headline(s) found.")
-        else:
-            freshest = max(
-                (n.published for n in news if n.published is not None),
-                default=None,
+    if news_source is not None and settings.news_max_items > 0:
+        try:
+            news = news_source.news(name or symbol, max_items=settings.news_max_items)
+            news_sentiment = aggregate_sentiment(
+                news, halflife_days=settings.news_recency_halflife_days
             )
-            if freshest is not None:
-                age_days = (datetime.now(timezone.utc) - freshest).days
-                if age_days > 14:
-                    warnings.append(f"Stale news — freshest headline is {age_days} days old.")
+            if len(news) < 3:
+                warnings.append(f"Thin news coverage — only {len(news)} headline(s) found.")
+            else:
+                freshest = max(
+                    (n.published for n in news if n.published is not None),
+                    default=None,
+                )
+                if freshest is not None:
+                    age_days = (datetime.now(timezone.utc) - freshest).days
+                    if age_days > 14:
+                        warnings.append(f"Stale news — freshest headline is {age_days} days old.")
+        except Exception as exc:  # news is optional; never lose the deterministic price analysis
+            warnings.append(f"News unavailable: {exc}")
+
+    seed_macro = sorted({signal.label for signal in macro_signals if signal.fetched_at is None})
+    if seed_macro:
+        warnings.append(
+            "Macro overlay pack(s) are unrefreshed seed data: "
+            + ", ".join(seed_macro)
+            + ". Refresh the relevant pack before relying on its magnitude."
+        )
 
     return StockSnapshot(
         symbol=symbol,

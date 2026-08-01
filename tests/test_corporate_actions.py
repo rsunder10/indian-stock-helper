@@ -81,6 +81,18 @@ def test_parser_flags_recent_split_and_ratio():
     assert old.recent_split is False
 
 
+def test_parser_ignores_actions_after_data_as_of():
+    future = _corporate_actions(
+        _actions([("2025-06-01", 8.0, 2.0)]),
+        as_of=date(2024, 12, 31), lookback_years=6, split_recency_days=365,
+    )
+    assert future is not None
+    assert future.dividend_paying_years == 0
+    assert future.last_dividend is None
+    assert future.last_split_date is None
+    assert future.recent_split is None
+
+
 def test_parser_returns_none_for_empty_history():
     assert _corporate_actions(pd.DataFrame(), as_of=None, lookback_years=6, split_recency_days=365) is None
     assert _corporate_actions(None, as_of=None, lookback_years=6, split_recency_days=365) is None

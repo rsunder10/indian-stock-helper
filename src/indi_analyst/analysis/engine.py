@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from indi_analyst.analysis.levels import compute_levels
 from indi_analyst.analysis.scoring import score as quant_score
-from indi_analyst.analysis.snapshot import build_snapshot
+from indi_analyst.analysis.snapshot import DEFAULT_NEWS_SOURCE, build_snapshot
 from indi_analyst.analysis.valuation import compute_valuation
 from indi_analyst.config import Settings, get_settings
 from indi_analyst.llm.base import LLMProvider, ProviderError
@@ -19,7 +19,7 @@ def analyze(
     provider: str | None = None,
     settings: Settings | None = None,
     price_source=None,
-    news_source=None,
+    news_source=DEFAULT_NEWS_SOURCE,
 ) -> Recommendation:
     """Full pipeline. `provider` overrides the configured default; sources are injectable."""
     settings = settings or get_settings()
@@ -40,7 +40,7 @@ def analyze_snapshot(
     settings = settings or get_settings()
 
     levels = compute_levels(snapshot, settings)
-    quant = quant_score(snapshot)
+    quant = quant_score(snapshot, settings)
     valuation = compute_valuation(snapshot, settings)
 
     llm, note = build_provider_with_fallback(provider, settings)
