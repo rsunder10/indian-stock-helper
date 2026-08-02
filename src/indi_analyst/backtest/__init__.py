@@ -15,14 +15,14 @@ from indi_analyst.backtest.replay import snapshot_at
 from indi_analyst.backtest.simulator import resolve_exit, simulate_symbol
 
 __all__ = [
-    "run_backtest",
-    "simulate_symbol",
-    "snapshot_at",
-    "resolve_exit",
-    "aggregate",
-    "compute_stats",
     "BacktestResult",
     "BacktestStats",
     "SymbolResult",
     "Trade",
+    "aggregate",
+    "compute_stats",
+    "resolve_exit",
+    "run_backtest",
+    "simulate_symbol",
+    "snapshot_at",
 ]

@@ -31,8 +31,8 @@ def test_atr_positive():
 
 def test_bollinger_ordering():
     df = make_ohlcv("flat")
-    u, m, l = technical.bollinger(df["Close"])
-    assert u.iloc[-1] >= m.iloc[-1] >= l.iloc[-1]
+    upper, mid, lower = technical.bollinger(df["Close"])
+    assert upper.iloc[-1] >= mid.iloc[-1] >= lower.iloc[-1]
 
 
 def test_compute_full_signalset_uptrend():

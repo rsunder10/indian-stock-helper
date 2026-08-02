@@ -21,7 +21,13 @@ dependencies = [
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.30"]
 gemini = ["google-generativeai>=0.7"]
-dev = ["pytest>=8.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pre-commit>=3.7",
+]
 
 [project.scripts]
 indi-analyst = "indi_analyst.cli:main"
@@ -36,3 +42,102 @@ packages = ["src/indi_analyst"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = "-q"
+
+# --- Linting & formatting (ruff) ---
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests", "scripts"]
+# ruff >=0.16 reformats Python inside Markdown fences; docs keep author-aligned examples on purpose.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort (import sorting)
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific
+]
+# Deterministic-pipeline math occasionally reads clearer with explicit forms; keep these relaxed.
+ignore = [
+    "E501",   # line length is enforced by the formatter, not the linter
+    "SIM108", # ternary-vs-if is a readability judgement call
+    "SIM102", # nested guards with documenting comments read clearer than one compound condition
+    "B008",   # function calls in argument defaults (used intentionally, e.g. typer/streamlit-style)
+    # This is an Indian-finance tool: ₹, ×, en-dashes and curly quotes in text are intentional.
+    "RUF001", # ambiguous unicode in strings
+    "RUF002", # ambiguous unicode in docstrings
+    "RUF003", # ambiguous unicode in comments
+    # `class X(str, Enum)` and `enum.StrEnum` differ in str() semantics; switching would change
+    # rendered output, which is out of scope for a zero-behavior-change pass.
+    "UP042",  # replace-str-enum
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]  # asserts in tests are fine
+
+[tool.ruff.lint.isort]
+known-first-party = ["indi_analyst"]
+
+# --- Static type checking (mypy) ---
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "scripts"]
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+no_implicit_optional = true
+# Check the bodies of even un-annotated functions so real type errors surface, but don't force a
+# full annotation campaign on internal helpers / duck-typed source params (out of scope here).
+# Tightening to disallow_incomplete_defs is a good follow-up once annotations are backfilled.
+check_untyped_defs = true
+
+# Untyped third-party libraries (no stubs, or optional SDKs imported lazily) — silence import
+# errors only; we still type-check our own code that uses them.
+[[tool.mypy.overrides]]
+module = [
+    "yfinance.*",
+    "feedparser.*",
+    "vaderSentiment.*",
+    "streamlit.*",
+    "plotly.*",
+    "pandas.*",
+    "anthropic.*",
+    "openai.*",
+    "google.*",
+]
+ignore_missing_imports = true
+
+# numpy ships py.typed stubs, but they use 3.12-only `type` statements that fail to parse under
+# our 3.11 target. Skip following into them rather than pin the whole project to 3.12.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
+# --- Coverage ---
+[tool.coverage.run]
+source = ["indi_analyst"]
+branch = true
+omit = ["*/app/dashboard.py"]  # Streamlit UI is exercised manually, not in the offline suite
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Regression floor, not an aspiration: the deterministic core sits well above this; the interactive
+# CLI and network-only LLM providers are exercised manually, not in the offline suite. Ratchet up
+# as those gaps get covered.
+fail_under = 60
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

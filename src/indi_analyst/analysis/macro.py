@@ -14,11 +14,15 @@ there automatically — the framework preserves the technical-only backtest guar
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import partial
-from typing import Callable
 
 from indi_analyst.analysis.budget import resolve_budget_signal
-from indi_analyst.analysis.overlays import SENSITIVITY_OVERLAYS, load_overlay_pack, resolve_overlay_signal
+from indi_analyst.analysis.overlays import (
+    SENSITIVITY_OVERLAYS,
+    load_overlay_pack,
+    resolve_overlay_signal,
+)
 from indi_analyst.analysis.rates import resolve_rate_signal
 from indi_analyst.analysis.sector_match import clamp
 from indi_analyst.config import Settings, get_settings
@@ -94,7 +98,9 @@ def national_context(settings: Settings | None = None) -> list[str]:
     national-indicator overlay — and returns short, human-readable lines (no per-stock context).
     Packs that are missing/disabled are simply skipped, so the strip degrades gracefully.
     """
-    from indi_analyst.analysis.rates import load_rate_pack  # local import: avoid a cycle at module load
+    from indi_analyst.analysis.rates import (
+        load_rate_pack,  # local import: avoid a cycle at module load
+    )
 
     settings = settings or get_settings()
     lines: list[str] = []

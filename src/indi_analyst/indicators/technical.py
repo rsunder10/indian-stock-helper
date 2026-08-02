@@ -53,9 +53,9 @@ def bollinger(close: pd.Series, period: int = 20, k: float = 2.0):
 
 def atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
     prev_close = close.shift(1)
-    tr = pd.concat(
-        [(high - low), (high - prev_close).abs(), (low - prev_close).abs()], axis=1
-    ).max(axis=1)
+    tr = pd.concat([(high - low), (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(
+        axis=1
+    )
     return tr.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
 
 
@@ -66,17 +66,25 @@ def adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> 
     minus_dm = np.where((down > up) & (down > 0), down, 0.0)
 
     prev_close = close.shift(1)
-    tr = pd.concat(
-        [(high - low), (high - prev_close).abs(), (low - prev_close).abs()], axis=1
-    ).max(axis=1)
+    tr = pd.concat([(high - low), (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(
+        axis=1
+    )
     atr_ = tr.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
 
-    plus_di = 100 * pd.Series(plus_dm, index=high.index).ewm(
-        alpha=1 / period, min_periods=period, adjust=False
-    ).mean() / atr_
-    minus_di = 100 * pd.Series(minus_dm, index=high.index).ewm(
-        alpha=1 / period, min_periods=period, adjust=False
-    ).mean() / atr_
+    plus_di = (
+        100
+        * pd.Series(plus_dm, index=high.index)
+        .ewm(alpha=1 / period, min_periods=period, adjust=False)
+        .mean()
+        / atr_
+    )
+    minus_di = (
+        100
+        * pd.Series(minus_dm, index=high.index)
+        .ewm(alpha=1 / period, min_periods=period, adjust=False)
+        .mean()
+        / atr_
+    )
 
     dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
     return dx.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
@@ -122,9 +130,7 @@ def compute(df: pd.DataFrame) -> TechnicalSignals:
     week52_high = float(win.max())
     week52_low = float(win.min())
     week52_position = (
-        (last_close - week52_low) / (week52_high - week52_low)
-        if week52_high > week52_low
-        else None
+        (last_close - week52_low) / (week52_high - week52_low) if week52_high > week52_low else None
     )
 
     volume = _last(vol) if vol is not None else None

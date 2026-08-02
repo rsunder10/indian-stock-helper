@@ -27,7 +27,7 @@ def rank(rows: list[ScreenRow], by: str = "score", descending: bool = True) -> l
     if key is None:
         raise ValueError(f"Cannot rank by '{by}'. Options: {sorted(_RANK_KEYS)}.")
     worst = float("-inf") if descending else float("inf")
-    return sorted(rows, key=lambda r: (key(r) if key(r) is not None else worst), reverse=descending)
+    return sorted(rows, key=lambda r: key(r) if key(r) is not None else worst, reverse=descending)
 
 
 def resolve_preset(name: str) -> ScreenFilter:

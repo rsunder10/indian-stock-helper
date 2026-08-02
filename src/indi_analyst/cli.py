@@ -94,8 +94,10 @@ def render(rec: Recommendation) -> str:
         as_of = f" · as of {s.data_as_of:%Y-%m-%d}" if s.data_as_of else ""
         lines.append(f"Data: {s.data_source}{as_of}")
     lines.append("")
-    lines.append(f"CALL: {rec.action.value}   Conviction: {rec.conviction.value}   "
-                 f"Score: {q.score:.0f}/100 (tech {q.technical_score:.0f} / fund {q.fundamental_score:.0f})")
+    lines.append(
+        f"CALL: {rec.action.value}   Conviction: {rec.conviction.value}   "
+        f"Score: {q.score:.0f}/100 (tech {q.technical_score:.0f} / fund {q.fundamental_score:.0f})"
+    )
     lines.append(f"Analyst provider: {rec.provider}")
     lines.append("")
     lines.append("TRADE LEVELS")
@@ -112,9 +114,7 @@ def render(rec: Recommendation) -> str:
             f"  Estimate : ₹{val.fair_value:,.2f}  (range ₹{val.low:,.0f}–₹{val.high:,.0f})"
         )
         if val.margin_of_safety is not None:
-            lines.append(
-                f"  Vs price : {_fmt_pct(val.margin_of_safety)} — {val.rating}{conf}"
-            )
+            lines.append(f"  Vs price : {_fmt_pct(val.margin_of_safety)} — {val.rating}{conf}")
         exp = explain_valuation(val, t.last_close, s.name or s.symbol)
         if exp is not None:
             lines.append("")
@@ -146,12 +146,12 @@ def render(rec: Recommendation) -> str:
         lines.append("")
         adj = f"  (combined score {q.macro_adjustment:+.1f} pts)" if q.macro_adjustment else ""
         lines.append(f"MACRO OVERLAYS{adj}")
-        for m in s.macro_signals:
-            freshness = f"refreshed {m.fetched_at}" if m.fetched_at else "seed/unrefreshed"
+        for sig in s.macro_signals:
+            freshness = f"refreshed {sig.fetched_at}" if sig.fetched_at else "seed/unrefreshed"
             lines.append(
-                f"  {m.label} · {m.sector} · tailwind {m.tailwind:+.2f} · {freshness}"
+                f"  {sig.label} · {sig.sector} · tailwind {sig.tailwind:+.2f} · {freshness}"
             )
-            for d in m.drivers:
+            for d in sig.drivers:
                 lines.append(f"    · {d}")
     lines.append("")
     lines.append("THESIS")
@@ -234,7 +234,9 @@ def render_sectors(summaries: list, top: int | None = None) -> str:
         lines.append("MACRO: " + "   ".join(nat))
     lines.append("  — rank sectors by combined tailwind, then drill in with --sector")
     lines.append("=" * 96)
-    lines.append(f"{'#':>2}  {'SECTOR':<28}{'TAILWIND':>9}{'#OV':>5}{'AVG':>7}{'N':>4}  TOP / TOP DRIVER")
+    lines.append(
+        f"{'#':>2}  {'SECTOR':<28}{'TAILWIND':>9}{'#OV':>5}{'AVG':>7}{'N':>4}  TOP / TOP DRIVER"
+    )
     lines.append("-" * 96)
     for i, s in enumerate(shown, 1):
         tw = f"{s.macro_tailwind:+.2f}" if s.macro_tailwind is not None else "—"
@@ -242,7 +244,9 @@ def render_sectors(summaries: list, top: int | None = None) -> str:
         avg = f"{s.avg_score:.0f}" if s.avg_score is not None else "—"
         tops = ", ".join(sym.replace(".NS", "") for sym in s.top_symbols[:3])
         driver = f"  ·  {s.drivers[0]}" if s.drivers else ""
-        lines.append(f"{i:>2}  {s.sector[:28]:<28}{tw:>9}{nov:>5}{avg:>7}{s.n_stocks:>4}  {tops}{driver}")
+        lines.append(
+            f"{i:>2}  {s.sector[:28]:<28}{tw:>9}{nov:>5}{avg:>7}{s.n_stocks:>4}  {tops}{driver}"
+        )
     if not shown:
         lines.append("  (no sectors to summarize)")
     return "\n".join(lines)
@@ -465,28 +469,44 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_an = sub.add_parser("analyze", help="Deep-dive a single stock (default).")
     p_an.add_argument("query", help="Ticker or symbol, e.g. RELIANCE, TCS, INFY.NS")
-    p_an.add_argument("--provider", default=None,
-                      help="LLM provider: ollama | anthropic | openai | gemini | rulebased.")
+    p_an.add_argument(
+        "--provider",
+        default=None,
+        help="LLM provider: ollama | anthropic | openai | gemini | rulebased.",
+    )
     p_an.set_defaults(func=_cmd_analyze)
 
     p_sc = sub.add_parser("screen", help="Scan a universe and rank the best ideas.")
-    p_sc.add_argument("--universe", default="nifty50",
-                      help="nifty50 | nifty200 | nifty500 | watchlist:SYM1,SYM2 | file:/path.csv")
+    p_sc.add_argument(
+        "--universe",
+        default="nifty50",
+        help="nifty50 | nifty200 | nifty500 | watchlist:SYM1,SYM2 | file:/path.csv",
+    )
     p_sc.add_argument("--provider", default=None, help="LLM provider (default: config).")
     p_sc.add_argument("--top", type=int, default=15, help="Show only the top N rows (0 = all).")
     p_sc.add_argument("--limit", type=int, default=None, help="Scan at most N constituents.")
-    p_sc.add_argument("--preset", default=None,
-                      help="high-conviction-buys | oversold-quality | breakout-with-fundamentals")
+    p_sc.add_argument(
+        "--preset",
+        default=None,
+        help="high-conviction-buys | oversold-quality | breakout-with-fundamentals",
+    )
     p_sc.add_argument("--min-score", type=float, default=None)
     p_sc.add_argument("--min-rr", type=float, default=None, help="Minimum risk:reward.")
     p_sc.add_argument("--max-pe", type=float, default=None)
-    p_sc.add_argument("--min-upside", type=float, default=None,
-                      help="Minimum margin of safety vs fair value, e.g. 0.15 for +15%%.")
+    p_sc.add_argument(
+        "--min-upside",
+        type=float,
+        default=None,
+        help="Minimum margin of safety vs fair value, e.g. 0.15 for +15%%.",
+    )
     p_sc.add_argument("--action", default=None, help="Comma list, e.g. BUY,ACCUMULATE.")
     p_sc.add_argument("--sector", default=None, help="Comma list of sector substrings.")
     p_sc.add_argument("--digest", action="store_true", help="Append a top-ideas digest.")
-    p_sc.add_argument("--sectors-summary", action="store_true",
-                      help="Prepend a top-down macro sector-tailwind ranking (all government overlays).")
+    p_sc.add_argument(
+        "--sectors-summary",
+        action="store_true",
+        help="Prepend a top-down macro sector-tailwind ranking (all government overlays).",
+    )
     p_sc.add_argument("--no-cache", action="store_true", help="Bypass the snapshot cache.")
     p_sc.add_argument("--format", choices=["table", "json"], default="table")
     p_sc.set_defaults(func=_cmd_screen, top=15)
@@ -495,14 +515,27 @@ def build_parser() -> argparse.ArgumentParser:
         "backtest",
         help="Walk-forward test the technical signal + trade levels over history.",
     )
-    p_bt.add_argument("query", nargs="?", default=None,
-                      help="Single symbol, e.g. RELIANCE. Omit and use --universe for a batch.")
-    p_bt.add_argument("--universe", default=None,
-                      help="nifty50 | nifty200 | nifty500 | watchlist:SYM1,SYM2 | file:/path.csv")
-    p_bt.add_argument("--period", default=None, help="History period, e.g. 3y, 5y, max (default: config).")
-    p_bt.add_argument("--hold", type=int, default=None, help="Max bars to hold a trade (default: config).")
+    p_bt.add_argument(
+        "query",
+        nargs="?",
+        default=None,
+        help="Single symbol, e.g. RELIANCE. Omit and use --universe for a batch.",
+    )
+    p_bt.add_argument(
+        "--universe",
+        default=None,
+        help="nifty50 | nifty200 | nifty500 | watchlist:SYM1,SYM2 | file:/path.csv",
+    )
+    p_bt.add_argument(
+        "--period", default=None, help="History period, e.g. 3y, 5y, max (default: config)."
+    )
+    p_bt.add_argument(
+        "--hold", type=int, default=None, help="Max bars to hold a trade (default: config)."
+    )
     p_bt.add_argument("--limit", type=int, default=None, help="Backtest at most N symbols.")
-    p_bt.add_argument("--top", type=int, default=20, help="Show only the top N per-symbol rows (0 = all).")
+    p_bt.add_argument(
+        "--top", type=int, default=20, help="Show only the top N per-symbol rows (0 = all)."
+    )
     p_bt.add_argument("--format", choices=["table", "json"], default="table")
     p_bt.set_defaults(func=_cmd_backtest, top=20)
     return parser

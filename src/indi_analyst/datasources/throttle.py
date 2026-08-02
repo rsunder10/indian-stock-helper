@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Callable, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -60,5 +61,7 @@ def retry(
             last = e
             if attempt < attempts - 1 and backoff > 0:
                 time.sleep(backoff * 2**attempt)
-    assert last is not None  # unreachable: attempts >= 1 so the loop ran and either returned or set last
+    assert (
+        last is not None
+    )  # unreachable: attempts >= 1 so the loop ran and either returned or set last
     raise last

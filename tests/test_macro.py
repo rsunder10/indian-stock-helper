@@ -14,15 +14,23 @@ from tests.conftest import MockPriceSource, make_ohlcv
 
 
 def _settings(**over) -> Settings:
-    base = {"default_llm_provider": "rulebased", "budget_year": "2026-27", "rate_pack_version": "2026"}
+    base = {
+        "default_llm_provider": "rulebased",
+        "budget_year": "2026-27",
+        "rate_pack_version": "2026",
+    }
     base.update(over)
     return Settings(**base)
 
 
 def _snap_for_sector(sector: str | None, **over):
     fund = Fundamentals(
-        pe_ratio=22.0, roe=0.19, debt_to_equity=0.4, revenue_growth=0.18,
-        profit_margin=0.16, sector=sector,
+        pe_ratio=22.0,
+        roe=0.19,
+        debt_to_equity=0.4,
+        revenue_growth=0.18,
+        profit_margin=0.16,
+        sector=sector,
     )
     return build_snapshot(
         "TEST",
@@ -33,6 +41,7 @@ def _snap_for_sector(sector: str | None, **over):
 
 
 # --- Resolution: multiple overlays fire on one sector -----------------------
+
 
 def test_capital_goods_gets_budget_and_rate():
     sigs = resolve_macro_signals("Capital Goods", _settings())
@@ -51,6 +60,7 @@ def test_unmapped_sector_yields_no_signals():
 
 
 # --- Combining under the shared cap -----------------------------------------
+
 
 def test_combined_delta_is_capped():
     s = _settings()
@@ -81,6 +91,7 @@ def test_empty_signals_zero():
 
 # --- Scoring integration ----------------------------------------------------
 
+
 def test_macro_nudges_composite_up():
     snap = _snap_for_sector("Capital Goods")
     assert snap.macro_signals  # budget + rate fired
@@ -107,8 +118,14 @@ def test_unmapped_sector_scores_inert():
 
 
 _ALL_OVERLAYS_OFF = {
-    "budget_enabled": False, "rate_enabled": False, "iip_enabled": False, "gst_enabled": False,
-    "credit_enabled": False, "trade_enabled": False, "inputcost_enabled": False, "monsoon_enabled": False,
+    "budget_enabled": False,
+    "rate_enabled": False,
+    "iip_enabled": False,
+    "gst_enabled": False,
+    "credit_enabled": False,
+    "trade_enabled": False,
+    "inputcost_enabled": False,
+    "monsoon_enabled": False,
 }
 
 
@@ -119,6 +136,7 @@ def test_disabled_overlays_score_inert():
 
 
 # --- Backtest stays inert (no look-ahead: no historical macro packs) --------
+
 
 def test_backtest_snapshot_has_no_macro_signals():
     df = make_ohlcv("up", n=250)

@@ -6,9 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # --- LLM provider selection ---
     # one of: ollama | anthropic | openai | gemini | rulebased
@@ -62,7 +60,9 @@ class Settings(BaseSettings):
     # Budget overlay (bundled Union-Budget pack; build-time fetch: scripts/refresh_budget.py)
     budget_enabled: bool = True  # master switch for the budget overlay
     budget_year: str = "2026-27"  # selects the latest bundled data/budget_<year>.json pack
-    budget_data_path: str | None = None  # optional override path to a pack JSON; else the bundled one
+    budget_data_path: str | None = (
+        None  # optional override path to a pack JSON; else the bundled one
+    )
     budget_max_points: float = 5.0  # per-source cap on the budget nudge
     budget_yoy_scale: float = 20.0  # allocation YoY% that maps to a full (+/-1) tailwind
     budget_api_key: str | None = None  # free data.gov.in OGD key — build-time fetch only (shared)
@@ -101,7 +101,9 @@ class Settings(BaseSettings):
     trade_max_points: float = 2.0
     trade_scale: float = 12.0
 
-    inputcost_enabled: bool = True  # WPI input-cost inflation (headwind for consumers, tailwind for producers)
+    inputcost_enabled: bool = (
+        True  # WPI input-cost inflation (headwind for consumers, tailwind for producers)
+    )
     inputcost_pack_version: str = "2026"
     inputcost_data_path: str | None = None
     inputcost_max_points: float = 2.0

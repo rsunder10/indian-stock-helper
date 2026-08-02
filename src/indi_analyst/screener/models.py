@@ -7,7 +7,7 @@ enums so filters and the UI speak the same language as the single-stock path.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +18,7 @@ _CONVICTION_RANK = {Conviction.LOW: 0, Conviction.MEDIUM: 1, Conviction.HIGH: 2}
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Constituent(BaseModel):
@@ -63,7 +63,9 @@ class ScreenRow(BaseModel):
     # the combined, bounded, signed nudge the overlays added to `score`; `macro_signals` carries every
     # overlay that fired so any screen can show per-source detail. `budget_tailwind`/`budget_drivers`
     # are kept as a back-compatible convenience over the budget overlay specifically.
-    macro_points: float | None = None  # combined macro nudge in score points (== quant.macro_adjustment)
+    macro_points: float | None = (
+        None  # combined macro nudge in score points (== quant.macro_adjustment)
+    )
     macro_signals: list[SectorMacroSignal] = Field(default_factory=list)  # every overlay that fired
     budget_tailwind: float | None = None  # sector budget tailwind (-1..+1), None if unmapped
     budget_drivers: list[str] = Field(default_factory=list)  # plain-English budget drivers
@@ -86,13 +88,21 @@ class SectorSummary(BaseModel):
     """
 
     sector: str
-    macro_tailwind: float | None = None  # mean overlay tailwind across all sources, None if unmapped
-    overlays: list[str] = Field(default_factory=list)  # labels of the overlays that fired for the sector
-    budget_tailwind: float | None = None  # per-sector constant from the budget pack, None if unmapped
+    macro_tailwind: float | None = (
+        None  # mean overlay tailwind across all sources, None if unmapped
+    )
+    overlays: list[str] = Field(
+        default_factory=list
+    )  # labels of the overlays that fired for the sector
+    budget_tailwind: float | None = (
+        None  # per-sector constant from the budget pack, None if unmapped
+    )
     n_stocks: int = 0
     avg_score: float | None = None
     top_symbols: list[str] = Field(default_factory=list)  # highest-scoring names in the sector
-    drivers: list[str] = Field(default_factory=list)  # one plain-English driver per overlay that fired
+    drivers: list[str] = Field(
+        default_factory=list
+    )  # one plain-English driver per overlay that fired
 
 
 class ScanResult(BaseModel):
@@ -140,7 +150,7 @@ class ScreenFilter(BaseModel):
         if self.actions and row.action not in self.actions:
             return False
         if self.min_conviction is not None:
-            rc = _CONVICTION_RANK.get(row.conviction, -1)
+            rc = _CONVICTION_RANK.get(row.conviction, -1) if row.conviction is not None else -1
             if rc < _CONVICTION_RANK[self.min_conviction]:
                 return False
         if self.sectors:
@@ -163,9 +173,7 @@ class ScreenFilter(BaseModel):
             # No macro overlays (e.g. unmapped/sectorless) fails a macro-tailwind floor.
             if row.macro_points is None or row.macro_points < self.min_macro_points:
                 return False
-        if self.trend is not None and (row.trend or "").lower() != self.trend.lower():
-            return False
-        return True
+        return not (self.trend is not None and (row.trend or "").lower() != self.trend.lower())
 
 
 # Named screens — quick-start presets referenced by the CLI and dashboard.

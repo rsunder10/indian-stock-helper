@@ -16,7 +16,7 @@ import os
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from indi_analyst.models import StockSnapshot
@@ -24,12 +24,12 @@ from indi_analyst.screener.models import Constituent, ScanResult, ScreenRow
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _parse(ts: str) -> datetime:
     dt = datetime.fromisoformat(ts)
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 class ScanCache:

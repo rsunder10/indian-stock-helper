@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -103,7 +103,7 @@ def build_snapshot(
                     default=None,
                 )
                 if freshest is not None:
-                    age_days = (datetime.now(timezone.utc) - freshest).days
+                    age_days = (datetime.now(UTC) - freshest).days
                     if age_days > 14:
                         warnings.append(f"Stale news — freshest headline is {age_days} days old.")
         except Exception as exc:  # news is optional; never lose the deterministic price analysis

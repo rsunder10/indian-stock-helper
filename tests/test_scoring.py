@@ -30,7 +30,10 @@ def test_score_uses_supplied_macro_cap():
         technicals=TechnicalSignals(last_close=100.0),
         macro_signals=[
             SectorMacroSignal(
-                kind="budget", label="Budget", sector="Testing", tailwind=1.0,
+                kind="budget",
+                label="Budget",
+                sector="Testing",
+                tailwind=1.0,
             )
         ],
     )

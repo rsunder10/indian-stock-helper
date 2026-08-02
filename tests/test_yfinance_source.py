@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -159,7 +161,11 @@ def test_history_coerces_malformed_numeric_values(monkeypatch):
 def test_history_retries_transient_failure(monkeypatch):
     good = pd.DataFrame(
         {
-            "Open": [100.0], "High": [102.0], "Low": [99.0], "Close": [101.0], "Volume": [1000],
+            "Open": [100.0],
+            "High": [102.0],
+            "Low": [99.0],
+            "Close": [101.0],
+            "Volume": [1000],
         },
         index=pd.date_range("2026-01-01", periods=1),
     )
@@ -242,14 +248,14 @@ def test_fundamentals_maps_new_per_share_fields(monkeypatch):
 
 
 def test_earnings_date_handles_shapes():
-    from datetime import date, datetime, timezone
+    from datetime import date, datetime
 
     from indi_analyst.datasources.yfinance_source import _earnings_date
 
     assert _earnings_date({"Earnings Date": [date(2026, 8, 15)]}).date() == date(2026, 8, 15)
     assert _earnings_date({}) is None
     assert _earnings_date(None) is None
-    df = pd.DataFrame({"Value": [datetime(2026, 8, 15, tzinfo=timezone.utc)]}, index=["Earnings Date"])
+    df = pd.DataFrame({"Value": [datetime(2026, 8, 15, tzinfo=UTC)]}, index=["Earnings Date"])
     assert _earnings_date(df).date() == date(2026, 8, 15)
 
 

@@ -138,7 +138,9 @@ def serialize(
             }
             for m in snapshot.macro_signals
         ]
-        payload["macro_score_adjustment"] = quant.macro_adjustment  # combined points added to the composite
+        payload["macro_score_adjustment"] = (
+            quant.macro_adjustment
+        )  # combined points added to the composite
     if valuation is not None and valuation.fair_value is not None:
         payload["fair_value"] = {
             "fair_value": valuation.fair_value,
@@ -148,7 +150,6 @@ def serialize(
             "confidence": valuation.confidence.value if valuation.confidence else None,
             "methods": [m.detail for m in valuation.methods],
         }
-    return (
-        "Analyze this stock and return your verdict as JSON.\n\n"
-        + json.dumps(payload, indent=2, default=str)
+    return "Analyze this stock and return your verdict as JSON.\n\n" + json.dumps(
+        payload, indent=2, default=str
     )

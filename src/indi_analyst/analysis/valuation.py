@@ -81,8 +81,10 @@ def _dividend_discount(
     # yfinance usually reports the yield as a fraction (0.012); guard the odd percent form.
     dy = div_yield / 100 if div_yield > 1 else div_yield
     d0 = dy * price  # current annual dividend per share
-    g = min(growth if growth is not None else settings.fair_value_terminal_growth,
-            settings.fair_value_terminal_growth)
+    g = min(
+        growth if growth is not None else settings.fair_value_terminal_growth,
+        settings.fair_value_terminal_growth,
+    )
     g = max(g, 0.0)
     r = settings.fair_value_discount_rate
     if r - g < 0.02:  # denominator too small -> the model explodes; skip it
@@ -106,11 +108,15 @@ def compute_valuation(snapshot: StockSnapshot, settings: Settings | None = None)
 
     # Prefer the source's reported per-share figures; otherwise back them out of the ratios
     # (eps = price / pe, bvps = price / pb).
-    eps = f.eps if f.eps and f.eps > 0 else (
-        price / f.pe_ratio if f.pe_ratio and f.pe_ratio > 0 else None
+    eps = (
+        f.eps
+        if f.eps and f.eps > 0
+        else (price / f.pe_ratio if f.pe_ratio and f.pe_ratio > 0 else None)
     )
-    bvps = f.book_value if f.book_value and f.book_value > 0 else (
-        price / f.pb_ratio if f.pb_ratio and f.pb_ratio > 0 else None
+    bvps = (
+        f.book_value
+        if f.book_value and f.book_value > 0
+        else (price / f.pb_ratio if f.pb_ratio and f.pb_ratio > 0 else None)
     )
     growth = _growth(f)
 
@@ -172,8 +178,10 @@ def compute_valuation(snapshot: StockSnapshot, settings: Settings | None = None)
         rating = "Fairly valued"
 
     confidence = (
-        Conviction.HIGH if len(methods) >= 3
-        else Conviction.MEDIUM if len(methods) == 2
+        Conviction.HIGH
+        if len(methods) >= 3
+        else Conviction.MEDIUM
+        if len(methods) == 2
         else Conviction.LOW
     )
 
@@ -298,9 +306,7 @@ def explain_valuation(
     else:
         margin_note = ""
 
-    confidence_note = (
-        _CONFIDENCE_PLAIN.get(val.confidence, "") if val.confidence else ""
-    )
+    confidence_note = _CONFIDENCE_PLAIN.get(val.confidence, "") if val.confidence else ""
 
     return ValuationExplanation(
         headline=headline,

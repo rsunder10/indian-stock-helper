@@ -6,14 +6,14 @@ needs to reason about a stock is captured here deterministically, before any LLM
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Action(str, Enum):
@@ -67,7 +67,9 @@ class CorporateActions(BaseModel):
     is derived where it's used, against config thresholds.
     """
 
-    dividend_paying_years: int | None = None  # distinct calendar years with a dividend, in the window
+    dividend_paying_years: int | None = (
+        None  # distinct calendar years with a dividend, in the window
+    )
     lookback_years: int | None = None  # size of the window examined (for transparent detail)
     last_dividend: float | None = None  # most recent dividend per share, currency units
     last_dividend_date: date | None = None
@@ -91,10 +93,14 @@ class SectorMacroSignal(BaseModel):
     label: str  # human-readable source label, e.g. "Union Budget 2026-27", "RBI rate cycle 2026-06"
     sector: str  # the sector key that matched (e.g. "Capital Goods")
     tailwind: float  # normalized -1..+1 (deterministic transform of the pack's numbers)
-    drivers: list[str] = Field(default_factory=list)  # plain-English, e.g. "Defence capex +9.5% YoY"
+    drivers: list[str] = Field(
+        default_factory=list
+    )  # plain-English, e.g. "Defence capex +9.5% YoY"
     citations: list[str] = Field(default_factory=list)  # source URLs from the pack
     as_of: str | None = None  # period the pack covers, e.g. "2026-27" (budget year) or "2026-06"
-    fetched_at: str | None = None  # pack refresh date; None means the bundled value is unrefreshed/seed data
+    fetched_at: str | None = (
+        None  # pack refresh date; None means the bundled value is unrefreshed/seed data
+    )
 
 
 class TechnicalSignals(BaseModel):
@@ -158,8 +164,12 @@ class StockSnapshot(BaseModel):
     data_as_of: datetime | None = None  # timestamp of the latest price bar (data freshness)
 
     fundamentals: Fundamentals = Field(default_factory=Fundamentals)
-    corporate_actions: CorporateActions | None = None  # dividend/split history, when the source has it
-    macro_signals: list[SectorMacroSignal] = Field(default_factory=list)  # budget / rate / … sector overlays
+    corporate_actions: CorporateActions | None = (
+        None  # dividend/split history, when the source has it
+    )
+    macro_signals: list[SectorMacroSignal] = Field(
+        default_factory=list
+    )  # budget / rate / … sector overlays
     technicals: TechnicalSignals
     news: list[NewsItem] = Field(default_factory=list)
     news_sentiment: float | None = None  # mean VADER compound across headlines
@@ -226,7 +236,9 @@ class QuantScore(BaseModel):
     score: float  # 0..100
     technical_score: float  # 0..100
     fundamental_score: float  # 0..100
-    macro_adjustment: float = 0.0  # combined points the macro overlays added to the composite (bounded, signed)
+    macro_adjustment: float = (
+        0.0  # combined points the macro overlays added to the composite (bounded, signed)
+    )
     reasons: list[str] = Field(default_factory=list)  # bullet rationale
 
 
@@ -237,7 +249,9 @@ class AnalystVerdict(BaseModel):
     from the QuantScore so the rest of the pipeline is provider-agnostic.
     """
 
-    thesis: list[str] = Field(default_factory=list, description="Why to invest — facts-based bullets")
+    thesis: list[str] = Field(
+        default_factory=list, description="Why to invest — facts-based bullets"
+    )
     conviction: Conviction = Conviction.MEDIUM
     action_agrees: bool = True  # does the analyst agree with the quant action?
     suggested_action: Action | None = None  # override if it disagrees

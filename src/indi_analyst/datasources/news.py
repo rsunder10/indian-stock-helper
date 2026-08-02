@@ -8,7 +8,7 @@ headline counts for less than this morning's — see :func:`aggregate_sentiment`
 from __future__ import annotations
 
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from statistics import mean
 from time import mktime
 
@@ -44,7 +44,7 @@ def _fetch(query: str) -> list[NewsItem]:
             continue
         published = None
         if getattr(entry, "published_parsed", None):
-            published = datetime.fromtimestamp(mktime(entry.published_parsed), tz=timezone.utc)
+            published = datetime.fromtimestamp(mktime(entry.published_parsed), tz=UTC)
         source = None
         if getattr(entry, "source", None):
             source = getattr(entry.source, "title", None)
@@ -61,7 +61,7 @@ def _fetch(query: str) -> list[NewsItem]:
 
 
 def _recency_key(item: NewsItem) -> datetime:
-    return item.published or datetime.min.replace(tzinfo=timezone.utc)
+    return item.published or datetime.min.replace(tzinfo=UTC)
 
 
 def aggregate_sentiment(
@@ -75,24 +75,26 @@ def aggregate_sentiment(
     Each headline's weight decays by half every ``halflife_days``; undated headlines get unit
     weight. With ``halflife_days <= 0`` (or no usable timestamps) this reduces to a plain mean.
     """
-    scored = [n for n in news if n.sentiment is not None]
+    # Pair each scored headline's (non-None) compound score with its timestamp; the walrus keeps
+    # the score typed as a plain float after the None filter.
+    scored = [(s, n.published) for n in news if (s := n.sentiment) is not None]
     if not scored:
         return None
     if halflife_days <= 0:
-        return round(mean(n.sentiment for n in scored), 3)
+        return round(mean(s for s, _ in scored), 3)
 
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     weights: list[float] = []
-    for n in scored:
-        if n.published is not None:
-            age_days = max(0.0, (now - n.published).total_seconds() / 86400.0)
+    for _s, published in scored:
+        if published is not None:
+            age_days = max(0.0, (now - published).total_seconds() / 86400.0)
             weights.append(0.5 ** (age_days / halflife_days))
         else:
             weights.append(1.0)
     total = sum(weights)
     if total <= 0:  # every headline decayed to ~0 weight — fall back to a plain mean
-        return round(mean(n.sentiment for n in scored), 3)
-    agg = sum(w * n.sentiment for w, n in zip(weights, scored)) / total
+        return round(mean(s for s, _ in scored), 3)
+    agg = sum(w * s for w, (s, _) in zip(weights, scored, strict=False)) / total
     return round(agg, 3)
 
 

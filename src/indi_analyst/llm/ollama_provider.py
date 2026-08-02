@@ -43,9 +43,7 @@ class OllamaProvider:
             ],
         }
         try:
-            resp = httpx.post(
-                f"{self.base_url}/api/chat", json=payload, timeout=self.timeout
-            )
+            resp = httpx.post(f"{self.base_url}/api/chat", json=payload, timeout=self.timeout)
             resp.raise_for_status()
         except httpx.ConnectError as e:
             raise ProviderError(

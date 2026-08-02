@@ -36,7 +36,9 @@ def load_rate_pack(settings: Settings | None = None) -> dict | None:
         if p.is_file():
             text = p.read_text(encoding="utf-8")
     else:
-        resource = resources.files("indi_analyst").joinpath(f"data/rates_{settings.rate_pack_version}.json")
+        resource = resources.files("indi_analyst").joinpath(
+            f"data/rates_{settings.rate_pack_version}.json"
+        )
         if resource.is_file():
             with resource.open("r", encoding="utf-8") as fh:
                 text = fh.read()
@@ -45,7 +47,11 @@ def load_rate_pack(settings: Settings | None = None) -> dict | None:
     if text is not None:
         try:
             parsed = json.loads(text)
-            if isinstance(parsed, dict) and parsed.get("sector_sensitivity") and parsed.get("repo_rate") is not None:
+            if (
+                isinstance(parsed, dict)
+                and parsed.get("sector_sensitivity")
+                and parsed.get("repo_rate") is not None
+            ):
                 pack = parsed
         except (json.JSONDecodeError, ValueError):
             pack = None
@@ -97,7 +103,9 @@ def resolve_rate_signal(
     if abs(tailwind) < 1e-9:  # neutral regime or insensitive sector — nothing to say
         return None
 
-    regime = pack.get("regime") or ("easing" if sign > 0 else "tightening" if sign < 0 else "neutral")
+    regime = pack.get("regime") or (
+        "easing" if sign > 0 else "tightening" if sign < 0 else "neutral"
+    )
     repo = pack.get("repo_rate")
     cpi = pack.get("cpi_yoy")
     detail = f"RBI repo {repo:.2f}% ({regime}"

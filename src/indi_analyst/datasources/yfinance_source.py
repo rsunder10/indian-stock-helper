@@ -10,7 +10,7 @@ downstream into a recommendation.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pandas as pd
 import yfinance as yf
@@ -56,7 +56,7 @@ def _corporate_actions(
     if div_col is not None:
         min_year = ref.year - lookback_years + 1
         paid_years: set[int] = set()
-        for d, v in zip(dates, div_col):
+        for d, v in zip(dates, div_col, strict=False):
             if d > ref:
                 continue
             if v and v > 0:
@@ -68,8 +68,14 @@ def _corporate_actions(
 
     last_split_date = last_split_ratio = recent_split = None
     if split_col is not None:
-        for d, v in zip(dates, split_col):
-            if d <= ref and v and v > 0 and v != 1 and (last_split_date is None or d > last_split_date):
+        for d, v in zip(dates, split_col, strict=False):
+            if (
+                d <= ref
+                and v
+                and v > 0
+                and v != 1
+                and (last_split_date is None or d > last_split_date)
+            ):
                 last_split_date, last_split_ratio = d, _split_ratio(float(v))
         if last_split_date is not None:
             age_days = (ref - last_split_date).days
@@ -116,7 +122,7 @@ def _earnings_date(calendar) -> datetime | None:
             dt = pd.Timestamp(value).to_pydatetime()
     except Exception:
         return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def _f(value) -> float | None:
@@ -174,7 +180,11 @@ class YFinanceSource:
         for sym in candidates:
             info = self._safe_info(sym)
             # a valid ticker returns a price field
-            if info and (info.get("regularMarketPrice") or info.get("currentPrice") or info.get("previousClose")):
+            if info and (
+                info.get("regularMarketPrice")
+                or info.get("currentPrice")
+                or info.get("previousClose")
+            ):
                 exchange = "NSE" if sym.endswith(".NS") else "BSE"
                 name = info.get("longName") or info.get("shortName")
                 return sym, name, exchange
@@ -208,7 +218,9 @@ class YFinanceSource:
             converted = pd.to_numeric(raw, errors="coerce")
             invalid = raw.notna() & converted.isna()
             if invalid.any():
-                warnings.append(f"Coerced {int(invalid.sum())} non-numeric {col} value(s) to missing.")
+                warnings.append(
+                    f"Coerced {int(invalid.sum())} non-numeric {col} value(s) to missing."
+                )
             df[col] = converted
 
         try:
@@ -248,13 +260,17 @@ class YFinanceSource:
             before = len(df)
             df = df[hi_ok & lo_ok]
             if (dropped := before - len(df)) > 0:
-                warnings.append(f"Dropped {dropped} bar(s) with inconsistent OHLC (High/Low out of range).")
+                warnings.append(
+                    f"Dropped {dropped} bar(s) with inconsistent OHLC (High/Low out of range)."
+                )
 
         if "Volume" in df.columns:
             negative_volume = df["Volume"] < 0
             if negative_volume.any():
                 df.loc[negative_volume, "Volume"] = float("nan")
-                warnings.append(f"Replaced {int(negative_volume.sum())} negative volume value(s) with missing.")
+                warnings.append(
+                    f"Replaced {int(negative_volume.sum())} negative volume value(s) with missing."
+                )
 
         if df.empty:
             raise ValueError(f"No valid price bars for '{symbol}' after data-quality checks.")

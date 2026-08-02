@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from indi_analyst.analysis.macro import national_context, resolve_macro_signals
 from indi_analyst.analysis.overlays import (
     SENSITIVITY_OVERLAYS,
@@ -44,7 +42,9 @@ def test_iip_helps_cyclical_sector():
 
 def test_inputcost_is_a_headwind_for_consumers_but_tailwind_for_producers():
     # direction=-1: WPI 2.8 > neutral 2.0. Auto sensitivity +0.8 -> headwind; Metals -0.6 -> tailwind.
-    consumer = resolve_overlay_signal(_SPEC["inputcost"], "Automobile and Auto Components", _settings())
+    consumer = resolve_overlay_signal(
+        _SPEC["inputcost"], "Automobile and Auto Components", _settings()
+    )
     producer = resolve_overlay_signal(_SPEC["inputcost"], "Metals & Mining", _settings())
     assert consumer is not None and consumer.tailwind < 0
     assert producer is not None and producer.tailwind > 0
@@ -58,7 +58,12 @@ def test_insensitive_sector_yields_no_signal():
 def test_unmapped_none_and_disabled():
     assert resolve_overlay_signal(_SPEC["gst"], "Nonexistent Sector", _settings()) is None
     assert resolve_overlay_signal(_SPEC["gst"], None, _settings()) is None
-    assert resolve_overlay_signal(_SPEC["gst"], "Fast Moving Consumer Goods", _settings(gst_enabled=False)) is None
+    assert (
+        resolve_overlay_signal(
+            _SPEC["gst"], "Fast Moving Consumer Goods", _settings(gst_enabled=False)
+        )
+        is None
+    )
 
 
 def test_scale_controls_magnitude():
@@ -73,7 +78,9 @@ def test_value_on_baseline_is_inert(tmp_path):
     flat = dict(pack, value=pack["neutral"])  # exactly on the zero-nudge baseline
     p = tmp_path / "iip_x.json"
     p.write_text(json.dumps(flat), encoding="utf-8")
-    sig = resolve_overlay_signal(_SPEC["iip"], "Capital Goods", _settings(iip_pack_version="x", iip_data_path=str(p)))
+    sig = resolve_overlay_signal(
+        _SPEC["iip"], "Capital Goods", _settings(iip_pack_version="x", iip_data_path=str(p))
+    )
     assert sig is None
 
 

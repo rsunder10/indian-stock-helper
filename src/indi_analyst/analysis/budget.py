@@ -40,7 +40,9 @@ def load_budget_pack(settings: Settings | None = None) -> dict | None:
         if p.is_file():
             text = p.read_text(encoding="utf-8")
     else:
-        resource = resources.files("indi_analyst").joinpath(f"data/budget_{settings.budget_year}.json")
+        resource = resources.files("indi_analyst").joinpath(
+            f"data/budget_{settings.budget_year}.json"
+        )
         if resource.is_file():
             with resource.open("r", encoding="utf-8") as fh:
                 text = fh.read()

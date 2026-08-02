@@ -176,7 +176,9 @@ def score(snap: StockSnapshot, settings: Settings | None = None) -> QuantScore:
         action = Action.SELL
 
     spread = abs(composite - 50)
-    conviction = Conviction.HIGH if spread >= 18 else Conviction.MEDIUM if spread >= 8 else Conviction.LOW
+    conviction = (
+        Conviction.HIGH if spread >= 18 else Conviction.MEDIUM if spread >= 8 else Conviction.LOW
+    )
 
     return QuantScore(
         action=action,

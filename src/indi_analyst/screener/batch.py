@@ -8,9 +8,9 @@ symbol — one bad ticker never sinks the scan.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from hashlib import sha256
-from typing import Callable
 
 from indi_analyst.analysis.engine import analyze_snapshot
 from indi_analyst.analysis.snapshot import DEFAULT_NEWS_SOURCE, build_snapshot
@@ -38,16 +38,36 @@ def _snapshot_cache_key(settings: Settings, price_source, news_source) -> str:
     else:
         news_name = f"{type(news_source).__module__}.{type(news_source).__qualname__}"
     names = [
-        "history_period", "news_max_items", "news_recency_halflife_days",
-        "corporate_action_lookback_years", "dividend_min_consistent_years", "split_recency_days",
-        "budget_enabled", "budget_year", "budget_data_path",
-        "rate_enabled", "rate_pack_version", "rate_data_path",
-        "iip_enabled", "iip_pack_version", "iip_data_path",
-        "gst_enabled", "gst_pack_version", "gst_data_path",
-        "credit_enabled", "credit_pack_version", "credit_data_path",
-        "trade_enabled", "trade_pack_version", "trade_data_path",
-        "inputcost_enabled", "inputcost_pack_version", "inputcost_data_path",
-        "monsoon_enabled", "monsoon_pack_version", "monsoon_data_path",
+        "history_period",
+        "news_max_items",
+        "news_recency_halflife_days",
+        "corporate_action_lookback_years",
+        "dividend_min_consistent_years",
+        "split_recency_days",
+        "budget_enabled",
+        "budget_year",
+        "budget_data_path",
+        "rate_enabled",
+        "rate_pack_version",
+        "rate_data_path",
+        "iip_enabled",
+        "iip_pack_version",
+        "iip_data_path",
+        "gst_enabled",
+        "gst_pack_version",
+        "gst_data_path",
+        "credit_enabled",
+        "credit_pack_version",
+        "credit_data_path",
+        "trade_enabled",
+        "trade_pack_version",
+        "trade_data_path",
+        "inputcost_enabled",
+        "inputcost_pack_version",
+        "inputcost_data_path",
+        "monsoon_enabled",
+        "monsoon_pack_version",
+        "monsoon_data_path",
     ]
     material = [source_name, news_name]
     material.extend(f"{name}={getattr(settings, name)}" for name in names)
@@ -143,7 +163,7 @@ def scan_universe(
     Sources are injectable (tests pass a network-free mock). `limit` caps the symbol count.
     """
     settings = settings or get_settings()
-    resolved_provider = (provider or settings.default_llm_provider)
+    resolved_provider = provider or settings.default_llm_provider
 
     # Build one shared, rate-limited source so all worker threads are paced as a group
     # (a single RateLimiter instance) instead of each thread constructing its own unthrottled one.
@@ -155,9 +175,7 @@ def scan_universe(
         cache = ScanCache(settings.screener_cache_path)
 
     warnings: list[str] = []
-    members = load_universe(
-        universe, settings=settings, cache=cache, warnings=warnings
-    )
+    members = load_universe(universe, settings=settings, cache=cache, warnings=warnings)
     if limit is not None:
         members = members[:limit]
 
@@ -180,10 +198,8 @@ def scan_universe(
             ): c
             for c in members
         }
-        done = 0
-        for fut in as_completed(futures):
+        for done, fut in enumerate(as_completed(futures), start=1):
             rows.append(fut.result())
-            done += 1
             if on_progress is not None:
                 on_progress(done, total, futures[fut].symbol)
 

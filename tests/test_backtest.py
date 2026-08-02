@@ -20,8 +20,8 @@ from indi_analyst.config import Settings
 from indi_analyst.models import Action, Conviction
 from tests.conftest import make_ohlcv
 
-
 # --- replay: no look-ahead -------------------------------------------------------------------
+
 
 def test_no_look_ahead():
     """snapshot_at(df, i) must not change when future bars are appended to df."""
@@ -47,6 +47,7 @@ def test_snapshot_is_technical_only():
 
 
 # --- simulator: exit resolution --------------------------------------------------------------
+
 
 def _series(values) -> pd.Series:
     return pd.Series([float(v) for v in values])
@@ -96,8 +97,9 @@ def test_resolve_exit_same_bar_stop_wins():
 
 # --- simulator: end-to-end over the real pipeline --------------------------------------------
 
+
 def _bt_settings(**overrides) -> Settings:
-    base = dict(backtest_warmup_bars=30, backtest_max_hold_bars=20)
+    base = {"backtest_warmup_bars": 30, "backtest_max_hold_bars": 20}
     base.update(overrides)
     return Settings(**base)
 
@@ -127,7 +129,9 @@ def test_simulate_symbol_short_history_errors_cleanly():
 def test_entry_actions_gate_trades():
     df = make_ohlcv("up", n=300)
     # Only SELL opens a trade -> an uptrend produces none.
-    result = simulate_symbol(df, symbol="TEST.NS", settings=_bt_settings(backtest_entry_actions="SELL"))
+    result = simulate_symbol(
+        df, symbol="TEST.NS", settings=_bt_settings(backtest_entry_actions="SELL")
+    )
     assert result.error is None
     assert result.trades == []
 
@@ -138,6 +142,7 @@ def test_parse_entry_actions_fallback():
 
 
 # --- metrics ---------------------------------------------------------------------------------
+
 
 def _trade(ret: float, r: float, day: int, action=Action.BUY, conv=Conviction.MEDIUM) -> Trade:
     return Trade(
@@ -156,7 +161,12 @@ def _trade(ret: float, r: float, day: int, action=Action.BUY, conv=Conviction.ME
 
 
 def test_compute_stats_known_values():
-    trades = [_trade(0.10, 2.0, 1), _trade(0.05, 1.0, 2), _trade(-0.04, -1.0, 3), _trade(-0.02, -0.5, 4)]
+    trades = [
+        _trade(0.10, 2.0, 1),
+        _trade(0.05, 1.0, 2),
+        _trade(-0.04, -1.0, 3),
+        _trade(-0.02, -0.5, 4),
+    ]
     s = compute_stats(trades)
     assert s.trades == 4
     assert s.wins == 2 and s.losses == 2
@@ -175,7 +185,9 @@ def test_compute_stats_empty():
 
 def test_aggregate_pools_trades_and_benchmarks():
     r1 = SymbolResult(symbol="A.NS", trades=[_trade(0.10, 2.0, 1)], bars=300, buy_hold_return=0.20)
-    r2 = SymbolResult(symbol="B.NS", trades=[_trade(-0.04, -1.0, 2)], bars=300, buy_hold_return=0.40)
+    r2 = SymbolResult(
+        symbol="B.NS", trades=[_trade(-0.04, -1.0, 2)], bars=300, buy_hold_return=0.40
+    )
     res = aggregate([r1, r2], target="watchlist:A,B", settings=_bt_settings())
     assert res.symbols == 2 and res.ok_symbols == 2
     assert res.stats.trades == 2
@@ -184,6 +196,7 @@ def test_aggregate_pools_trades_and_benchmarks():
 
 
 # --- engine: orchestration + failure isolation -----------------------------------------------
+
 
 class _FlakySource:
     """History raises for any symbol containing BAD; returns a fixture frame otherwise."""
@@ -212,9 +225,7 @@ def test_run_backtest_single_symbol():
 
 def test_run_backtest_isolates_failures():
     df = make_ohlcv("up", n=300)
-    res = run_backtest(
-        "watchlist:GOOD,BAD", settings=_bt_settings(), price_source=_FlakySource(df)
-    )
+    res = run_backtest("watchlist:GOOD,BAD", settings=_bt_settings(), price_source=_FlakySource(df))
     assert res.symbols == 2
     assert res.ok_symbols == 1
     assert any("BAD" in w for w in res.warnings)

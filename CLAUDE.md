@@ -10,10 +10,20 @@
 ## Commands
 
 ```bash
-uv sync
-uv run --extra dev pytest
-uv run --extra dev pytest tests/test_levels.py -q
+uv sync --extra dev
+uv run pytest
+uv run pytest tests/test_levels.py -q
 uv run python -m compileall -q src tests
+```
+
+Quality gates (also enforced in CI via `.github/workflows/ci.yml`; the same set runs on commit
+if you `uv run pre-commit install`):
+
+```bash
+uv run ruff check .          # lint
+uv run ruff format .         # auto-format (use --check in CI)
+uv run mypy                  # static type check (src + scripts)
+uv run pytest --cov          # tests with coverage (fails under 60%)
 ```
 
 Use injected or fixture-backed sources for tests. Do not make live market-data calls in the test suite.

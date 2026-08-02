@@ -72,6 +72,8 @@ def _run_verdict(llm: LLMProvider, snapshot, levels, quant, valuation):
         return llm.verdict(snapshot, levels, quant, valuation)
     except ProviderError as e:
         if not isinstance(llm, RuleBasedProvider):
-            snapshot.warnings.append(f"{getattr(llm, 'name', 'provider')} failed ({e}); used rule-based verdict.")
+            snapshot.warnings.append(
+                f"{getattr(llm, 'name', 'provider')} failed ({e}); used rule-based verdict."
+            )
             return RuleBasedProvider().verdict(snapshot, levels, quant, valuation)
         raise

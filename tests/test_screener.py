@@ -10,7 +10,7 @@ from indi_analyst.models import Action, Conviction, Fundamentals, StockSnapshot,
 from indi_analyst.screener import scan_universe, summarize_sectors
 from indi_analyst.screener.cache import ScanCache
 from indi_analyst.screener.filters import apply, rank, resolve_preset
-from indi_analyst.screener.models import Constituent, ScanResult, ScreenFilter, ScreenRow
+from indi_analyst.screener.models import ScanResult, ScreenFilter, ScreenRow
 from indi_analyst.screener.universe import load_universe
 from tests.conftest import make_ohlcv
 
@@ -33,8 +33,12 @@ class MockMultiSource:
 
     def fundamentals(self, symbol: str) -> Fundamentals:
         return Fundamentals(
-            pe_ratio=22.0, roe=0.19, debt_to_equity=0.4, revenue_growth=0.18,
-            profit_margin=0.16, sector="Testing",
+            pe_ratio=22.0,
+            roe=0.19,
+            debt_to_equity=0.4,
+            revenue_growth=0.18,
+            profit_margin=0.16,
+            sector="Testing",
         )
 
 
@@ -46,13 +50,9 @@ def _settings(tmp_path):
 
 # --- Batch scan -------------------------------------------------------------
 
+
 def test_scan_universe_ranks_and_isolates_errors(tmp_path):
     settings = _settings(tmp_path)
-    members = [
-        Constituent(symbol="UP.NS", name="Up Corp", sector="Testing"),
-        Constituent(symbol="DOWN.NS", name="Down Corp", sector="Testing"),
-        Constituent(symbol="BAD.NS", name="Bad Corp", sector="Testing"),
-    ]
     source = MockMultiSource({"UP.NS": "up", "DOWN.NS": "down", "BAD.NS": "bad"})
 
     result = scan_universe(
@@ -93,8 +93,14 @@ def test_scan_uses_snapshot_cache(tmp_path):
             return super().history(symbol, period)
 
     source = CountingSource({"UP.NS": "up"})
-    kwargs = dict(provider="rulebased", settings=settings, price_source=source,
-                  news_source=None, cache=cache, max_workers=1)
+    kwargs = {
+        "provider": "rulebased",
+        "settings": settings,
+        "price_source": source,
+        "news_source": None,
+        "cache": cache,
+        "max_workers": 1,
+    }
 
     scan_universe("watchlist:UP.NS", **kwargs)
     first = source.history_calls
@@ -119,8 +125,13 @@ def test_snapshot_cache_isolated_by_history_settings(tmp_path):
 
     source = CountingSource({"UP.NS": "up"})
     scan_universe(
-        "watchlist:UP.NS", provider="rulebased", settings=settings,
-        price_source=source, news_source=None, cache=cache, max_workers=1,
+        "watchlist:UP.NS",
+        provider="rulebased",
+        settings=settings,
+        price_source=source,
+        news_source=None,
+        cache=cache,
+        max_workers=1,
     )
     first = source.history_calls
 
@@ -128,8 +139,13 @@ def test_snapshot_cache_isolated_by_history_settings(tmp_path):
     changed.snapshot_cache_ttl_hours = 24
     changed.history_period = "2y"
     scan_universe(
-        "watchlist:UP.NS", provider="rulebased", settings=changed,
-        price_source=source, news_source=None, cache=cache, max_workers=1,
+        "watchlist:UP.NS",
+        provider="rulebased",
+        settings=changed,
+        price_source=source,
+        news_source=None,
+        cache=cache,
+        max_workers=1,
     )
 
     assert first == 1
@@ -196,9 +212,17 @@ def test_load_universe_falls_back_when_pack_missing(monkeypatch, tmp_path):
 
 # --- Filters + presets ------------------------------------------------------
 
+
 def _row(symbol, action, conv, score, rr=2.5, sector="Testing", pe=20.0):
-    return ScreenRow(symbol=symbol, action=action, conviction=conv, score=score,
-                     risk_reward=rr, sector=sector, pe_ratio=pe)
+    return ScreenRow(
+        symbol=symbol,
+        action=action,
+        conviction=conv,
+        score=score,
+        risk_reward=rr,
+        sector=sector,
+        pe_ratio=pe,
+    )
 
 
 def test_filter_matches_and_rank():
@@ -228,6 +252,7 @@ def test_preset_resolves_and_narrows():
 
 
 # --- Sector summary (top-down budget view) ---------------------------------
+
 
 def test_summarize_sectors_groups_and_ranks_by_tailwind():
     rows = [
@@ -264,6 +289,7 @@ def test_summarize_sectors_skips_sectorless_or_scoreless_rows():
 
 # --- Sector summary: multi-overlay (all government data) --------------------
 
+
 def _macro_row(symbol, score, sector, signals):
     r = _row(symbol, Action.BUY, Conviction.HIGH, score, sector=sector)
     r.macro_signals = signals
@@ -275,9 +301,31 @@ def _macro_row(symbol, score, sector, signals):
 def test_summarize_sectors_ranks_by_combined_macro_tailwind():
     from indi_analyst.models import SectorMacroSignal as S
 
-    cg = [S(kind="budget", label="Union Budget", sector="Capital Goods", tailwind=0.6, drivers=["Railways +75%"]),
-          S(kind="iip", label="Industrial output (IIP)", sector="Capital Goods", tailwind=0.2, drivers=["IIP +3.5%"])]
-    it = [S(kind="trade", label="Merchandise exports", sector="IT", tailwind=0.1, drivers=["Exports +2.5%"])]
+    cg = [
+        S(
+            kind="budget",
+            label="Union Budget",
+            sector="Capital Goods",
+            tailwind=0.6,
+            drivers=["Railways +75%"],
+        ),
+        S(
+            kind="iip",
+            label="Industrial output (IIP)",
+            sector="Capital Goods",
+            tailwind=0.2,
+            drivers=["IIP +3.5%"],
+        ),
+    ]
+    it = [
+        S(
+            kind="trade",
+            label="Merchandise exports",
+            sector="IT",
+            tailwind=0.1,
+            drivers=["Exports +2.5%"],
+        )
+    ]
     rows = [
         _macro_row("A.NS", 70, "Capital Goods", cg),
         _macro_row("B.NS", 60, "Capital Goods", cg),
@@ -296,10 +344,15 @@ def test_summarize_sectors_ranks_by_combined_macro_tailwind():
 def test_min_macro_points_filter_and_macro_rank():
     from indi_analyst.models import SectorMacroSignal as S
 
-    strong = _macro_row("STRONG.NS", 70, "Capital Goods",
-                        [S(kind="budget", label="B", sector="Capital Goods", tailwind=0.8, drivers=["x"])])
-    weak = _macro_row("WEAK.NS", 68, "IT",
-                     [S(kind="trade", label="T", sector="IT", tailwind=0.05, drivers=["y"])])
+    strong = _macro_row(
+        "STRONG.NS",
+        70,
+        "Capital Goods",
+        [S(kind="budget", label="B", sector="Capital Goods", tailwind=0.8, drivers=["x"])],
+    )
+    weak = _macro_row(
+        "WEAK.NS", 68, "IT", [S(kind="trade", label="T", sector="IT", tailwind=0.05, drivers=["y"])]
+    )
     strong.macro_points, weak.macro_points = 4.0, 0.2
 
     kept = apply([strong, weak], ScreenFilter(min_macro_points=1.0))
@@ -311,10 +364,13 @@ def test_min_macro_points_filter_and_macro_rank():
 
 # --- Cache round-trip + temporal diff --------------------------------------
 
+
 def test_snapshot_cache_roundtrip_and_ttl(tmp_path):
     cache = ScanCache(str(tmp_path / "c.db"))
     snap = StockSnapshot(
-        symbol="X.NS", query="X", technicals=TechnicalSignals(last_close=100.0),
+        symbol="X.NS",
+        query="X",
+        technicals=TechnicalSignals(last_close=100.0),
     )
     cache.put_snapshot(snap)
     assert cache.get_snapshot("X.NS", ttl_hours=24) is not None
@@ -324,11 +380,17 @@ def test_snapshot_cache_roundtrip_and_ttl(tmp_path):
 
 def test_diff_scans_reports_action_changes(tmp_path):
     cache = ScanCache(str(tmp_path / "d.db"))
-    r1 = ScanResult(universe="nifty50", provider="rulebased",
-                    rows=[_row("A.NS", Action.HOLD, Conviction.LOW, 50)])
+    r1 = ScanResult(
+        universe="nifty50",
+        provider="rulebased",
+        rows=[_row("A.NS", Action.HOLD, Conviction.LOW, 50)],
+    )
     cache.save_scan(r1)
-    r2 = ScanResult(universe="nifty50", provider="rulebased",
-                    rows=[_row("A.NS", Action.BUY, Conviction.HIGH, 70)])
+    r2 = ScanResult(
+        universe="nifty50",
+        provider="rulebased",
+        rows=[_row("A.NS", Action.BUY, Conviction.HIGH, 70)],
+    )
     cache.save_scan(r2)
 
     diffs = cache.diff_scans("nifty50")

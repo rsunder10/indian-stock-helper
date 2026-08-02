@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from indi_analyst.analysis import snapshot as snapshot_module
 from indi_analyst.analysis.engine import analyze
 from indi_analyst.analysis.snapshot import build_snapshot
-from indi_analyst.analysis import snapshot as snapshot_module
 from indi_analyst.config import Settings
 from indi_analyst.models import Action, Conviction, Recommendation
 from tests.conftest import MockPriceSource, make_ohlcv
@@ -17,8 +17,11 @@ def _analyze(trend: str) -> Recommendation:
     settings = Settings(default_llm_provider="rulebased")
     # news_source=None -> skip network news fetch
     return analyze(
-        "TEST", provider="rulebased", settings=settings,
-        price_source=source, news_source=None,
+        "TEST",
+        provider="rulebased",
+        settings=settings,
+        price_source=source,
+        news_source=None,
     )
 
 
@@ -53,22 +56,26 @@ def test_snapshot_carries_data_quality_metadata():
     df = make_ohlcv("up", n=300)
     df.attrs["warnings"] = ["Dropped 2 bar(s) with non-positive prices."]
     df.attrs["source"] = "yfinance"
-    df.attrs["as_of"] = datetime(2026, 1, 5, tzinfo=timezone.utc)
+    df.attrs["as_of"] = datetime(2026, 1, 5, tzinfo=UTC)
 
     snap = build_snapshot(
-        "TEST", settings=Settings(default_llm_provider="rulebased"),
-        price_source=MockPriceSource(df), news_source=None,
+        "TEST",
+        settings=Settings(default_llm_provider="rulebased"),
+        price_source=MockPriceSource(df),
+        news_source=None,
     )
     assert snap.data_source == "yfinance"
-    assert snap.data_as_of == datetime(2026, 1, 5, tzinfo=timezone.utc)
+    assert snap.data_as_of == datetime(2026, 1, 5, tzinfo=UTC)
     assert "Dropped 2 bar(s) with non-positive prices." in snap.warnings
 
 
 def test_snapshot_without_attrs_still_builds():
     # A plain mock with no attrs must not break the merge (regression guard).
     snap = build_snapshot(
-        "TEST", settings=Settings(default_llm_provider="rulebased"),
-        price_source=MockPriceSource(make_ohlcv("up", n=300)), news_source=None,
+        "TEST",
+        settings=Settings(default_llm_provider="rulebased"),
+        price_source=MockPriceSource(make_ohlcv("up", n=300)),
+        news_source=None,
     )
     assert snap.data_source is None
     assert snap.data_as_of is None

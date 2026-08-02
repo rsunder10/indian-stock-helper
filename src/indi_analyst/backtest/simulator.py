@@ -78,9 +78,7 @@ def simulate_symbol(
 
     n = len(df)
     if n < warmup + 2:
-        return SymbolResult(
-            symbol=symbol, bars=n, error=f"Too few bars ({n}) for warmup {warmup}."
-        )
+        return SymbolResult(symbol=symbol, bars=n, error=f"Too few bars ({n}) for warmup {warmup}.")
 
     opens, highs, lows, closes = df["Open"], df["High"], df["Low"], df["Close"]
     index = df.index

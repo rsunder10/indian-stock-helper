@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from indi_analyst.datasources import news as news_mod
 from indi_analyst.datasources.news import GoogleNewsSource, aggregate_sentiment
 from indi_analyst.models import NewsItem
 
-NOW = datetime(2026, 7, 26, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 26, tzinfo=UTC)
 
 
 def _item(title, sentiment, age_days=None):
@@ -17,6 +17,7 @@ def _item(title, sentiment, age_days=None):
 
 
 # --- aggregate_sentiment ----------------------------------------------------
+
 
 def test_aggregate_none_when_no_scored_items():
     assert aggregate_sentiment([]) is None
@@ -53,6 +54,7 @@ def test_recency_weighting_orders_correctly():
 
 
 # --- GoogleNewsSource dedupe + ordering (fake _fetch, no network) -----------
+
 
 def test_news_dedupes_and_sorts_freshest_first(monkeypatch):
     batch_a = [

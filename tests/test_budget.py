@@ -18,6 +18,7 @@ def _settings(**over) -> Settings:
 
 # --- Pack loading -----------------------------------------------------------
 
+
 def test_bundled_pack_loads():
     pack = load_budget_pack(_settings())
     assert pack is not None
@@ -36,6 +37,7 @@ def test_malformed_pack_returns_none(tmp_path):
 
 
 # --- Sector resolution + transform ------------------------------------------
+
 
 def test_mapped_sector_positive_tailwind():
     sig = resolve_budget_signal("Power", _settings())

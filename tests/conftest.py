@@ -29,12 +29,21 @@ def make_ohlcv(trend: str = "up", n: int = 300, start: float = 100.0) -> pd.Data
 class MockPriceSource:
     """Injectable stand-in for YFinanceSource — no network."""
 
-    def __init__(self, df: pd.DataFrame, fundamentals: Fundamentals | None = None,
-                 symbol: str = "TEST.NS", name: str = "Test Corp"):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        fundamentals: Fundamentals | None = None,
+        symbol: str = "TEST.NS",
+        name: str = "Test Corp",
+    ):
         self._df = df
         self._fund = fundamentals or Fundamentals(
-            pe_ratio=22.0, roe=0.19, debt_to_equity=0.4, revenue_growth=0.18,
-            profit_margin=0.16, sector="Testing",
+            pe_ratio=22.0,
+            roe=0.19,
+            debt_to_equity=0.4,
+            revenue_growth=0.18,
+            profit_margin=0.16,
+            sector="Testing",
         )
         self._symbol = symbol
         self._name = name

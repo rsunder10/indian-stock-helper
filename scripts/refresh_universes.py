@@ -56,7 +56,7 @@ def refresh() -> int:
             try:
                 resp = client.get(url)
                 resp.raise_for_status()
-            except Exception as exc:  # noqa: BLE001 — surface any fetch failure, keep going
+            except Exception as exc:
                 print(f"  ✗ {key}: fetch failed ({exc})", file=sys.stderr)
                 failures += 1
                 continue
@@ -73,7 +73,9 @@ def refresh() -> int:
 
             out = _DATA_DIR / f"{key}.csv"
             out.write_text(text, encoding="utf-8")
-            print(f"  ✓ {key}: {count} constituents -> {out.relative_to(_DATA_DIR.parent.parent.parent)}")
+            print(
+                f"  ✓ {key}: {count} constituents -> {out.relative_to(_DATA_DIR.parent.parent.parent)}"
+            )
     return failures
 
 

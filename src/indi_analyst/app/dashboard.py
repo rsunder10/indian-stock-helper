@@ -43,14 +43,16 @@ def _history(symbol: str, period: str) -> pd.DataFrame:
 def _run(query: str, provider: str, period: str) -> Recommendation:
     settings = get_settings()
     settings.history_period = period
-    return analyze(query, provider=provider, settings=settings,
-                   price_source=build_price_source(settings))
+    return analyze(
+        query, provider=provider, settings=settings, price_source=build_price_source(settings)
+    )
 
 
 @st.cache_data(show_spinner=False, ttl=1800)
 def _scan(universe: str, provider: str, limit: int | None) -> ScanResult:
-    return scan_universe(universe, provider=provider, limit=limit,
-                         price_source=build_price_source(), use_cache=True)
+    return scan_universe(
+        universe, provider=provider, limit=limit, price_source=build_price_source(), use_cache=True
+    )
 
 
 @st.cache_data(show_spinner=False, ttl=1800)
@@ -58,52 +60,98 @@ def _backtest(target: str, period: str, hold: int, limit: int) -> BacktestResult
     settings = get_settings()
     settings.backtest_history_period = period
     settings.backtest_max_hold_bars = hold
-    return run_backtest(target, settings=settings, limit=limit,
-                        price_source=build_price_source(settings))
+    return run_backtest(
+        target, settings=settings, limit=limit, price_source=build_price_source(settings)
+    )
 
 
 def _price_chart(df: pd.DataFrame) -> go.Figure:
     close = df["Close"]
-    bb_u, bb_m, bb_l = technical.bollinger(close)
+    bb_u, _bb_m, bb_l = technical.bollinger(close)
     fig = make_subplots(
-        rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.03,
+        rows=3,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.03,
         row_heights=[0.6, 0.2, 0.2],
         subplot_titles=("Price + SMAs + Bollinger", "RSI (14)", "MACD"),
     )
     fig.add_trace(
         go.Candlestick(
-            x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=close,
-            name="Price", increasing_line_color="#16a34a", decreasing_line_color="#dc2626",
+            x=df.index,
+            open=df["Open"],
+            high=df["High"],
+            low=df["Low"],
+            close=close,
+            name="Price",
+            increasing_line_color="#16a34a",
+            decreasing_line_color="#dc2626",
         ),
-        row=1, col=1,
+        row=1,
+        col=1,
     )
     for span, color in ((20, "#2563eb"), (50, "#9333ea"), (200, "#f59e0b")):
         if len(close) >= span:
             fig.add_trace(
-                go.Scatter(x=df.index, y=close.rolling(span).mean(), name=f"SMA{span}",
-                           line=dict(width=1, color=color)),
-                row=1, col=1,
+                go.Scatter(
+                    x=df.index,
+                    y=close.rolling(span).mean(),
+                    name=f"SMA{span}",
+                    line={"width": 1, "color": color},
+                ),
+                row=1,
+                col=1,
             )
-    fig.add_trace(go.Scatter(x=df.index, y=bb_u, name="BB upper",
-                             line=dict(width=1, color="#94a3b8", dash="dot")), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df.index, y=bb_l, name="BB lower",
-                             line=dict(width=1, color="#94a3b8", dash="dot"),
-                             fill="tonexty", fillcolor="rgba(148,163,184,0.08)"), row=1, col=1)
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=bb_u,
+            name="BB upper",
+            line={"width": 1, "color": "#94a3b8", "dash": "dot"},
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=bb_l,
+            name="BB lower",
+            line={"width": 1, "color": "#94a3b8", "dash": "dot"},
+            fill="tonexty",
+            fillcolor="rgba(148,163,184,0.08)",
+        ),
+        row=1,
+        col=1,
+    )
 
     rsi = technical.rsi(close)
-    fig.add_trace(go.Scatter(x=df.index, y=rsi, name="RSI", line=dict(color="#0ea5e9")), row=2, col=1)
-    fig.add_hline(y=70, line=dict(color="#dc2626", width=1, dash="dash"), row=2, col=1)
-    fig.add_hline(y=30, line=dict(color="#16a34a", width=1, dash="dash"), row=2, col=1)
+    fig.add_trace(
+        go.Scatter(x=df.index, y=rsi, name="RSI", line={"color": "#0ea5e9"}), row=2, col=1
+    )
+    fig.add_hline(y=70, line={"color": "#dc2626", "width": 1, "dash": "dash"}, row=2, col=1)
+    fig.add_hline(y=30, line={"color": "#16a34a", "width": 1, "dash": "dash"}, row=2, col=1)
 
     macd_line, signal_line, hist = technical.macd(close)
-    fig.add_trace(go.Bar(x=df.index, y=hist, name="MACD hist",
-                         marker_color="rgba(100,116,139,0.5)"), row=3, col=1)
-    fig.add_trace(go.Scatter(x=df.index, y=macd_line, name="MACD", line=dict(color="#2563eb")), row=3, col=1)
-    fig.add_trace(go.Scatter(x=df.index, y=signal_line, name="signal", line=dict(color="#f59e0b")), row=3, col=1)
+    fig.add_trace(
+        go.Bar(x=df.index, y=hist, name="MACD hist", marker_color="rgba(100,116,139,0.5)"),
+        row=3,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(x=df.index, y=macd_line, name="MACD", line={"color": "#2563eb"}), row=3, col=1
+    )
+    fig.add_trace(
+        go.Scatter(x=df.index, y=signal_line, name="signal", line={"color": "#f59e0b"}),
+        row=3,
+        col=1,
+    )
 
     fig.update_layout(
-        height=680, margin=dict(l=10, r=10, t=40, b=10),
-        xaxis_rangeslider_visible=False, legend=dict(orientation="h", y=1.02, x=0),
+        height=680,
+        margin={"l": 10, "r": 10, "t": 40, "b": 10},
+        xaxis_rangeslider_visible=False,
+        legend={"orientation": "h", "y": 1.02, "x": 0},
         template="plotly_white",
     )
     return fig
@@ -125,14 +173,18 @@ def _recommendation_card(rec: Recommendation) -> None:
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Entry zone", f"₹{lv.entry_low:,.0f}–{lv.entry_high:,.0f}")
     c2.metric("Stop loss", f"₹{lv.stop_loss:,.0f}", f"{lv.stop_loss_pct * 100:+.1f}%")
-    c3.metric("Target 1 / 2", f"₹{lv.target_1:,.0f} / {lv.target_2:,.0f}",
-              f"{lv.target_1_pct * 100:+.1f}% / {lv.target_2_pct * 100:+.1f}%")
+    c3.metric(
+        "Target 1 / 2",
+        f"₹{lv.target_1:,.0f} / {lv.target_2:,.0f}",
+        f"{lv.target_1_pct * 100:+.1f}% / {lv.target_2_pct * 100:+.1f}%",
+    )
     c4.metric("Risk : Reward", f"{lv.risk_reward:.2f} : 1")
     val = rec.valuation
     if val.fair_value is not None:
         delta = (
             f"{val.margin_of_safety * 100:+.1f}% · {val.rating}"
-            if val.margin_of_safety is not None else val.rating
+            if val.margin_of_safety is not None
+            else val.rating
         )
         c5.metric("Fair value", f"₹{val.fair_value:,.0f}", delta, delta_color="normal")
     else:
@@ -144,16 +196,25 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
     s, t = rec.snapshot, rec.snapshot.technicals
     st.subheader(f"{s.name or s.symbol}  ·  {s.symbol} ({s.exchange})")
     top = st.columns(4)
-    top[0].metric("Last close", f"₹{t.last_close:,.2f}",
-                  f"{t.change_pct * 100:+.2f}%" if t.change_pct is not None else None)
+    top[0].metric(
+        "Last close",
+        f"₹{t.last_close:,.2f}",
+        f"{t.change_pct * 100:+.2f}%" if t.change_pct is not None else None,
+    )
     top[1].metric("RSI (14)", f"{t.rsi_14:.0f}" if t.rsi_14 is not None else "—")
     top[2].metric("Trend", (t.trend or "—").title())
-    top[3].metric("52w position", f"{t.week52_position * 100:.0f}%" if t.week52_position is not None else "—")
+    top[3].metric(
+        "52w position", f"{t.week52_position * 100:.0f}%" if t.week52_position is not None else "—"
+    )
 
     _recommendation_card(rec)
 
     if s.macro_signals:
-        adj = f" · combined score {rec.quant.macro_adjustment:+.1f} pts" if rec.quant.macro_adjustment else ""
+        adj = (
+            f" · combined score {rec.quant.macro_adjustment:+.1f} pts"
+            if rec.quant.macro_adjustment
+            else ""
+        )
         st.markdown(f"**Macro overlays**{adj}")
         nat = national_context()
         if nat:
@@ -208,13 +269,18 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
                 st.markdown("**The maths**")
             st.caption(
                 f"Range ₹{val.low:,.0f}–₹{val.high:,.0f}"
-                + (f"  ·  margin of safety {val.margin_of_safety * 100:+.1f}%"
-                   if val.margin_of_safety is not None else "")
+                + (
+                    f"  ·  margin of safety {val.margin_of_safety * 100:+.1f}%"
+                    if val.margin_of_safety is not None
+                    else ""
+                )
             )
             st.table(
-                {"Method": [m.name for m in val.methods],
-                 "Fair value (₹)": [f"{m.fair_value:,.0f}" for m in val.methods],
-                 "How": [m.detail for m in val.methods]}
+                {
+                    "Method": [m.name for m in val.methods],
+                    "Fair value (₹)": [f"{m.fair_value:,.0f}" for m in val.methods],
+                    "How": [m.detail for m in val.methods],
+                }
             )
             for reason in val.reasons:
                 st.caption(f"• {reason}")
@@ -222,21 +288,36 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
     with st.expander("Fundamentals"):
         f = s.fundamentals
         rows = {
-            "Market cap": f.market_cap, "P/E": f.pe_ratio, "Forward P/E": f.forward_pe,
-            "P/B": f.pb_ratio, "P/S": f.price_to_sales, "EPS": f.eps,
-            "Book value/sh": f.book_value, "ROE": f.roe, "Debt/Equity": f.debt_to_equity,
-            "Profit margin": f.profit_margin, "Revenue growth": f.revenue_growth,
-            "Dividend yield": f.dividend_yield, "Dividend/sh": f.dividend_rate,
-            "Next results": (f.next_earnings_date.date().isoformat() if f.next_earnings_date else None),
-            "Sector": f.sector, "Industry": f.industry,
+            "Market cap": f.market_cap,
+            "P/E": f.pe_ratio,
+            "Forward P/E": f.forward_pe,
+            "P/B": f.pb_ratio,
+            "P/S": f.price_to_sales,
+            "EPS": f.eps,
+            "Book value/sh": f.book_value,
+            "ROE": f.roe,
+            "Debt/Equity": f.debt_to_equity,
+            "Profit margin": f.profit_margin,
+            "Revenue growth": f.revenue_growth,
+            "Dividend yield": f.dividend_yield,
+            "Dividend/sh": f.dividend_rate,
+            "Next results": (
+                f.next_earnings_date.date().isoformat() if f.next_earnings_date else None
+            ),
+            "Sector": f.sector,
+            "Industry": f.industry,
         }
         ca = s.corporate_actions
         if ca is not None:
             if ca.dividend_paying_years is not None and ca.lookback_years:
-                rows["Dividend history"] = f"paid in {ca.dividend_paying_years} of last {ca.lookback_years} yrs"
+                rows["Dividend history"] = (
+                    f"paid in {ca.dividend_paying_years} of last {ca.lookback_years} yrs"
+                )
             if ca.last_split_ratio and ca.last_split_date is not None:
                 tag = " (recent)" if ca.recent_split else ""
-                rows["Last split"] = f"{ca.last_split_ratio} on {ca.last_split_date.isoformat()}{tag}"
+                rows["Last split"] = (
+                    f"{ca.last_split_ratio} on {ca.last_split_date.isoformat()}{tag}"
+                )
         for m in s.macro_signals:
             rows[f"{m.label} tailwind"] = f"{m.tailwind:+.2f} ({m.sector})"
         st.table({k: [("—" if v is None else v)] for k, v in rows.items()})
@@ -244,9 +325,17 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
     if s.news:
         with st.expander(f"Recent news ({len(s.news)})"):
             for n in s.news:
-                tone = "🟢" if (n.sentiment or 0) > 0.1 else "🔴" if (n.sentiment or 0) < -0.1 else "⚪"
+                tone = (
+                    "🟢"
+                    if (n.sentiment or 0) > 0.1
+                    else "🔴"
+                    if (n.sentiment or 0) < -0.1
+                    else "⚪"
+                )
                 link = f"[{n.title}]({n.link})" if n.link else n.title
-                st.markdown(f"{tone} {link}  \n*{n.source or ''} {n.published.date() if n.published else ''}*")
+                st.markdown(
+                    f"{tone} {link}  \n*{n.source or ''} {n.published.date() if n.published else ''}*"
+                )
 
     if s.warnings:
         for w in s.warnings:
@@ -256,7 +345,9 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
 
 def _single_stock_view(settings, provider: str) -> None:
     with st.sidebar:
-        query = st.text_input("Ticker / symbol", value="RELIANCE", help="e.g. RELIANCE, TCS, INFY.NS")
+        query = st.text_input(
+            "Ticker / symbol", value="RELIANCE", help="e.g. RELIANCE, TCS, INFY.NS"
+        )
         period = st.selectbox("History", ["6mo", "1y", "2y", "5y"], index=1)
         go_btn = st.button("Analyze", type="primary", width="stretch")
 
@@ -278,12 +369,24 @@ def _single_stock_view(settings, provider: str) -> None:
 def _screener_view(settings, provider: str) -> None:
     with st.sidebar:
         universe = st.selectbox("Universe", ["nifty50", "nifty200", "nifty500"], index=0)
-        limit = st.slider("Max symbols to scan", 5, 100, 20, step=5,
-                          help="Caps the scan for speed. Rule-based provider is fastest.")
+        limit = st.slider(
+            "Max symbols to scan",
+            5,
+            100,
+            20,
+            step=5,
+            help="Caps the scan for speed. Rule-based provider is fastest.",
+        )
         preset = st.selectbox("Preset", ["(none)", *PRESETS.keys()], index=0)
         min_score = st.slider("Min score", 0, 100, 0, step=5)
-        min_upside = st.slider("Min upside (fair value)", -50, 50, -50, step=5,
-                               help="Margin of safety vs fair value, %. -50 = no filter.")
+        min_upside = st.slider(
+            "Min upside (fair value)",
+            -50,
+            50,
+            -50,
+            step=5,
+            help="Margin of safety vs fair value, %. -50 = no filter.",
+        )
         scan_btn = st.button("Run scan", type="primary", width="stretch")
 
     if scan_btn:
@@ -305,7 +408,9 @@ def _screener_view(settings, provider: str) -> None:
     rows = rank(apply(result.rows, active), by="score")
 
     st.subheader(f"{result.universe} — {len(rows)} ideas")
-    st.caption(f"Scanned {result.ok_count} ok / {result.error_count} err · verdict via {result.provider}")
+    st.caption(
+        f"Scanned {result.ok_count} ok / {result.error_count} err · verdict via {result.provider}"
+    )
     for w in result.warnings:
         st.warning(w)
 
@@ -320,21 +425,26 @@ def _screener_view(settings, provider: str) -> None:
     sectors = summarize_sectors(result.ok_rows())
     if sectors:
         with st.expander("🏛️ Sector macro tailwinds (all government overlays)", expanded=True):
-            st.caption("Rank sectors by combined macro tailwind, then filter to one to find accumulate candidates.")
+            st.caption(
+                "Rank sectors by combined macro tailwind, then filter to one to find accumulate candidates."
+            )
             st.dataframe(
-                pd.DataFrame([
-                    {
-                        "Sector": s.sector,
-                        "Macro tailwind": s.macro_tailwind,
-                        "Overlays": len(s.overlays),
-                        "Avg score": s.avg_score,
-                        "Stocks": s.n_stocks,
-                        "Top names": ", ".join(sym.replace(".NS", "") for sym in s.top_symbols),
-                        "Top driver": s.drivers[0] if s.drivers else "—",
-                    }
-                    for s in sectors
-                ]),
-                width="stretch", hide_index=True,
+                pd.DataFrame(
+                    [
+                        {
+                            "Sector": s.sector,
+                            "Macro tailwind": s.macro_tailwind,
+                            "Overlays": len(s.overlays),
+                            "Avg score": s.avg_score,
+                            "Stocks": s.n_stocks,
+                            "Top names": ", ".join(sym.replace(".NS", "") for sym in s.top_symbols),
+                            "Top driver": s.drivers[0] if s.drivers else "—",
+                        }
+                        for s in sectors
+                    ]
+                ),
+                width="stretch",
+                hide_index=True,
             )
 
     if not rows:
@@ -397,15 +507,20 @@ def _bt_stats_row(name: str, s: BacktestStats) -> dict:
 def _backtest_view(settings) -> None:
     with st.sidebar:
         target = st.text_input(
-            "Symbol or universe", value="RELIANCE",
+            "Symbol or universe",
+            value="RELIANCE",
             help="A ticker (RELIANCE), watchlist:TCS,INFY, file:/path.csv, or nifty50/200/500.",
         )
         period = st.selectbox("History", ["2y", "3y", "5y", "max"], index=2)
         hold = st.slider("Max hold (bars)", 5, 120, settings.backtest_max_hold_bars, step=5)
         limit = st.slider(
-            "Max symbols (batch runs)", 1, 50, 10, step=1,
+            "Max symbols (batch runs)",
+            1,
+            50,
+            10,
+            step=1,
             help="Caps how many names a watchlist/index backtest fetches, so the run stays responsive. "
-                 "Full-index runs are better on the CLI.",
+            "Full-index runs are better on the CLI.",
         )
         go_btn = st.button("Run backtest", type="primary", width="stretch")
 
@@ -439,11 +554,16 @@ def _backtest_view(settings) -> None:
     cols = st.columns(6)
     cols[0].metric("Win rate", f"{s.win_rate * 100:.0f}%" if s.win_rate is not None else "—")
     cols[1].metric("Expectancy", f"{s.expectancy_r:+.2f}R" if s.expectancy_r is not None else "—")
-    cols[2].metric("Profit factor", f"{s.profit_factor:.2f}" if s.profit_factor is not None else "—")
+    cols[2].metric(
+        "Profit factor", f"{s.profit_factor:.2f}" if s.profit_factor is not None else "—"
+    )
     cols[3].metric("Avg return / trade", _bt_pct(s.avg_return_pct))
     cols[4].metric("Max drawdown", _bt_pct(s.max_drawdown))
-    cols[5].metric("Vs buy & hold", _bt_pct(s.buy_hold_return),
-                   help="Mean per-symbol buy-and-hold return over the same window.")
+    cols[5].metric(
+        "Vs buy & hold",
+        _bt_pct(s.buy_hold_return),
+        help="Mean per-symbol buy-and-hold return over the same window.",
+    )
 
     for w in result.warnings:
         st.warning(w)
@@ -456,43 +576,56 @@ def _backtest_view(settings) -> None:
         st.markdown("**By entry action**")
         st.dataframe(
             pd.DataFrame([_bt_stats_row(k, v) for k, v in result.by_action.items()]),
-            width="stretch", hide_index=True,
+            width="stretch",
+            hide_index=True,
         )
     if result.by_conviction:
         st.markdown("**By conviction**")
         st.dataframe(
             pd.DataFrame([_bt_stats_row(k, v) for k, v in result.by_conviction.items()]),
-            width="stretch", hide_index=True,
+            width="stretch",
+            hide_index=True,
         )
 
     per = [r for r in result.per_symbol if r.error is None and r.trades]
     if len(per) > 1:
         st.markdown("**Per symbol**")
         st.dataframe(
-            pd.DataFrame([
-                {"Symbol": r.symbol, "Trades": len(r.trades), "Buy & hold": _bt_pct(r.buy_hold_return)}
-                for r in sorted(per, key=lambda r: len(r.trades), reverse=True)
-            ]),
-            width="stretch", hide_index=True,
+            pd.DataFrame(
+                [
+                    {
+                        "Symbol": r.symbol,
+                        "Trades": len(r.trades),
+                        "Buy & hold": _bt_pct(r.buy_hold_return),
+                    }
+                    for r in sorted(per, key=lambda r: len(r.trades), reverse=True)
+                ]
+            ),
+            width="stretch",
+            hide_index=True,
         )
 
     with st.expander(f"All trades ({s.trades})"):
         st.dataframe(
-            pd.DataFrame([
-                {
-                    "Symbol": t.symbol,
-                    "Entry": t.entry_date.isoformat(),
-                    "Exit": t.exit_date.isoformat(),
-                    "Reason": t.exit_reason,
-                    "Return": _bt_pct(t.return_pct),
-                    "R": t.r_multiple,
-                    "Bars": t.bars_held,
-                    "Action": t.entry_action.value,
-                    "Conv": t.entry_conviction.value,
-                }
-                for r in per for t in r.trades
-            ]),
-            width="stretch", hide_index=True,
+            pd.DataFrame(
+                [
+                    {
+                        "Symbol": t.symbol,
+                        "Entry": t.entry_date.isoformat(),
+                        "Exit": t.exit_date.isoformat(),
+                        "Reason": t.exit_reason,
+                        "Return": _bt_pct(t.return_pct),
+                        "R": t.r_multiple,
+                        "Bars": t.bars_held,
+                        "Action": t.entry_action.value,
+                        "Conv": t.entry_conviction.value,
+                    }
+                    for r in per
+                    for t in r.trades
+                ]
+            ),
+            width="stretch",
+            hide_index=True,
         )
 
     st.caption(
@@ -503,7 +636,9 @@ def _backtest_view(settings) -> None:
 
 def main() -> None:
     st.title("📈 indi-analyst")
-    st.caption("Indian (NSE/BSE) stock analysis — buy / target / stop-loss with a facts-based thesis.")
+    st.caption(
+        "Indian (NSE/BSE) stock analysis — buy / target / stop-loss with a facts-based thesis."
+    )
 
     settings = get_settings()
     with st.sidebar:
@@ -512,18 +647,25 @@ def main() -> None:
         provider = None
         if mode != "Backtest":  # the backtest is technical-only — no LLM verdict involved
             providers = settings.configured_providers()
-            default_idx = providers.index(settings.default_llm_provider) if settings.default_llm_provider in providers else 0
+            default_idx = (
+                providers.index(settings.default_llm_provider)
+                if settings.default_llm_provider in providers
+                else 0
+            )
             provider = st.selectbox("LLM provider", providers, index=default_idx)
         st.caption("Price source: yfinance (free delayed/EOD baseline)")
 
+    # provider is always set for the non-Backtest modes above; fall back defensively for the type.
     if mode == "Screener":
-        _screener_view(settings, provider)
+        _screener_view(settings, provider or settings.default_llm_provider)
     elif mode == "Backtest":
         _backtest_view(settings)
     else:
-        _single_stock_view(settings, provider)
+        _single_stock_view(settings, provider or settings.default_llm_provider)
 
-    st.sidebar.caption("Local Ollama & rule-based need no API key. Cloud providers read keys from .env.")
+    st.sidebar.caption(
+        "Local Ollama & rule-based need no API key. Cloud providers read keys from .env."
+    )
 
 
 main()

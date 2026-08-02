@@ -9,7 +9,7 @@ fallback deterministic.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def match_sector_key(sector: str | None, keys: Iterable[str]) -> str | None:

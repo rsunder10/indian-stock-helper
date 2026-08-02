@@ -35,8 +35,10 @@ def summarize_sectors(rows: list[ScreenRow], *, top_symbols: int = 3) -> list[Se
 
     summaries: list[SectorSummary] = []
     for sector, group in buckets.items():
-        ranked = sorted(group, key=lambda r: r.score, reverse=True)
-        scores = [r.score for r in ranked]
+        # Every row in a bucket already has a non-None score (filtered above); make that explicit
+        # for the sort key and the average so the types stay float, not float | None.
+        ranked = sorted(group, key=lambda r: r.score if r.score is not None else 0.0, reverse=True)
+        scores = [s for r in ranked if (s := r.score) is not None]
 
         signals = _representative_signals(ranked)
         if signals:

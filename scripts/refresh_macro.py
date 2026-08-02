@@ -66,12 +66,17 @@ def _fetch_latest_value(resource: str, api_key: str, field: str) -> float | None
 
 def refresh(args) -> int:
     if args.kind not in _KINDS:
-        print(f"  ✗ unknown --kind {args.kind!r}; expected one of {sorted(_KINDS)}", file=sys.stderr)
+        print(
+            f"  ✗ unknown --kind {args.kind!r}; expected one of {sorted(_KINDS)}", file=sys.stderr
+        )
         return 1
 
     pack_path = _DATA_DIR / f"{args.kind}_{args.version}.json"
     if not pack_path.is_file():
-        print(f"  ✗ no bundled pack at {pack_path}; create the sensitivity skeleton first", file=sys.stderr)
+        print(
+            f"  ✗ no bundled pack at {pack_path}; create the sensitivity skeleton first",
+            file=sys.stderr,
+        )
         return 1
     pack = json.loads(pack_path.read_text(encoding="utf-8"))
 
@@ -79,15 +84,20 @@ def refresh(args) -> int:
     if args.resource:
         api_key = get_settings().budget_api_key  # from env or the gitignored .env
         if not api_key:
-            print("  ! --resource given but no BUDGET_API_KEY in env; skipping fetch", file=sys.stderr)
+            print(
+                "  ! --resource given but no BUDGET_API_KEY in env; skipping fetch", file=sys.stderr
+            )
         else:
             try:
                 value = _fetch_latest_value(args.resource, api_key, args.field)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 print(f"  ✗ fetch failed ({exc}); pack left unchanged", file=sys.stderr)
                 return 1
             if value is None:
-                print("  ✗ fetch returned no parseable value; check --field / resource", file=sys.stderr)
+                print(
+                    "  ✗ fetch returned no parseable value; check --field / resource",
+                    file=sys.stderr,
+                )
                 return 1
 
     if value is None:
@@ -114,11 +124,17 @@ def refresh(args) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Refresh a bundled national-indicator overlay pack.")
     ap.add_argument("--kind", required=True, help=f"overlay kind: {sorted(_KINDS)}")
-    ap.add_argument("--version", default="2026", help="Pack version selecting data/<kind>_<version>.json")
+    ap.add_argument(
+        "--version", default="2026", help="Pack version selecting data/<kind>_<version>.json"
+    )
     ap.add_argument("--value", type=float, default=None, help="set the headline number directly")
-    ap.add_argument("--neutral", type=float, default=None, help="optionally update the zero-nudge baseline")
+    ap.add_argument(
+        "--neutral", type=float, default=None, help="optionally update the zero-nudge baseline"
+    )
     ap.add_argument("--as-of", default=None, help="period label the number covers, e.g. 2026-06")
-    ap.add_argument("--resource", default=None, help="data.gov.in OGD resource id to fetch the value from")
+    ap.add_argument(
+        "--resource", default=None, help="data.gov.in OGD resource id to fetch the value from"
+    )
     ap.add_argument("--field", default="value", help="record field holding the headline number")
     ap.add_argument("--dry-run", action="store_true", help="preview, but do not write the pack")
     args = ap.parse_args()

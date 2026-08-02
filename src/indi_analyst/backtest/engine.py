@@ -8,7 +8,7 @@ symbol through the shared, rate-limited price source; per-symbol failures are is
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from indi_analyst.backtest.metrics import aggregate
 from indi_analyst.backtest.models import BacktestResult, SymbolResult

@@ -1,0 +1,30 @@
+# Run `uv run pre-commit install` once to enable these on every commit.
+# Mirrors the CI gates so problems are caught locally before they reach a push.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.1
+    hooks:
+      - id: ruff        # lint (with --fix)
+        args: [--fix]
+      - id: ruff-format # format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        # Match the project's mypy scope/config; needs the runtime deps for accurate types.
+        files: ^(src|scripts)/
+        additional_dependencies:
+          - pydantic>=2.6
+          - pydantic-settings>=2.2

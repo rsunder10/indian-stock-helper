@@ -41,7 +41,11 @@ class RuleBasedProvider:
         thesis = list(quant.reasons[:5])
 
         # Fold the fair-value read into the thesis when we have one.
-        if valuation is not None and valuation.fair_value is not None and valuation.margin_of_safety is not None:
+        if (
+            valuation is not None
+            and valuation.fair_value is not None
+            and valuation.margin_of_safety is not None
+        ):
             thesis.append(
                 f"Fair value ≈ ₹{valuation.fair_value:,.0f} "
                 f"({valuation.margin_of_safety * 100:+.0f}% vs price) — {valuation.rating}."
@@ -60,7 +64,11 @@ class RuleBasedProvider:
             risks.append("Sparse fundamentals from the free source — thesis leans technical.")
         if snapshot.news_sentiment is not None and snapshot.news_sentiment < -0.2:
             risks.append("Negative recent news flow.")
-        if valuation is not None and valuation.rating == "Overvalued" and valuation.margin_of_safety is not None:
+        if (
+            valuation is not None
+            and valuation.rating == "Overvalued"
+            and valuation.margin_of_safety is not None
+        ):
             risks.append(
                 f"Trades ~{-valuation.margin_of_safety * 100:.0f}% above estimated fair value — "
                 "limited margin of safety."
@@ -73,7 +81,9 @@ class RuleBasedProvider:
 
         catalysts: list[str] = []
         if t.resistances:
-            catalysts.append(f"A close above ₹{t.resistances[0]:.0f} would confirm upside continuation.")
+            catalysts.append(
+                f"A close above ₹{t.resistances[0]:.0f} would confirm upside continuation."
+            )
         if f.revenue_growth and f.revenue_growth > 0.15:
             catalysts.append("Sustained double-digit revenue growth into the next result.")
         for m in snapshot.macro_signals:

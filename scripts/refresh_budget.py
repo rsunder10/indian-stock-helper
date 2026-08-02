@@ -54,7 +54,7 @@ def _get(client: httpx.Client, url: str, params: dict, *, retries: int = 3, back
             resp = client.get(url, params=params)
             resp.raise_for_status()
             return resp.json()
-        except Exception as exc:  # noqa: BLE001 — retry any transient failure
+        except Exception as exc:
             last = exc
             time.sleep(backoff * 2**attempt)
     raise last  # type: ignore[misc]
@@ -70,7 +70,9 @@ def _num(v) -> float | None:
         return None
 
 
-def _fetch_rows(resource: str, api_key: str, fields: dict[str, str], row_filter: tuple[str, str] | None) -> dict[str, dict]:
+def _fetch_rows(
+    resource: str, api_key: str, fields: dict[str, str], row_filter: tuple[str, str] | None
+) -> dict[str, dict]:
     """Page through the OGD resource and fold records into a raw {head-name: {alloc, prev}} map.
 
     Government budget datasets are typically row-per-scheme with a per-head "Total" row; pass a
@@ -82,14 +84,25 @@ def _fetch_rows(resource: str, api_key: str, fields: dict[str, str], row_filter:
     offset = 0
     with httpx.Client(timeout=60.0, follow_redirects=True, headers=_HEADERS) as client:
         while True:
-            data = _get(client, url, {
-                "api-key": api_key, "format": "json", "limit": str(_PAGE), "offset": str(offset),
-            })
+            data = _get(
+                client,
+                url,
+                {
+                    "api-key": api_key,
+                    "format": "json",
+                    "limit": str(_PAGE),
+                    "offset": str(offset),
+                },
+            )
             records = data.get("records", [])
             if not records:
                 break
             for rec in records:
-                if row_filter and (rec.get(row_filter[0]) or "").strip().lower() != row_filter[1].strip().lower():
+                if (
+                    row_filter
+                    and (rec.get(row_filter[0]) or "").strip().lower()
+                    != row_filter[1].strip().lower()
+                ):
                     continue
                 name = (rec.get(fields["head"]) or "").strip()
                 alloc, prev = _num(rec.get(fields["alloc"])), _num(rec.get(fields["prev"]))
@@ -113,7 +126,10 @@ def _match_head(referenced_head: str, fetched_name: str) -> bool:
 def refresh(year, resource, api_key, fields, row_filter, dry_run) -> int:
     pack_path = _DATA_DIR / f"budget_{year}.json"
     if not pack_path.is_file():
-        print(f"  ✗ no bundled pack at {pack_path}; create the crosswalk skeleton first", file=sys.stderr)
+        print(
+            f"  ✗ no bundled pack at {pack_path}; create the crosswalk skeleton first",
+            file=sys.stderr,
+        )
         return 1
     pack = json.loads(pack_path.read_text(encoding="utf-8"))
 
@@ -128,11 +144,14 @@ def refresh(year, resource, api_key, fields, row_filter, dry_run) -> int:
 
     try:
         fetched = _fetch_rows(resource, api_key, fields, row_filter)
-    except Exception as exc:  # noqa: BLE001 — surface any fetch failure, keep the old pack
+    except Exception as exc:
         print(f"  ✗ fetch failed ({exc}); pack left unchanged", file=sys.stderr)
         return 1
     if not fetched:
-        print("  ✗ fetch returned no usable rows (check --resource / --field-* / --filter-*)", file=sys.stderr)
+        print(
+            "  ✗ fetch returned no usable rows (check --resource / --field-* / --filter-*)",
+            file=sys.stderr,
+        )
         return 1
 
     # Match the crosswalk's short heads (Defence, Railways, …) against the dataset's full names
@@ -152,42 +171,85 @@ def refresh(year, resource, api_key, fields, row_filter, dry_run) -> int:
                 hit = _match_head(head, name)
             if hit and agg["prev_cr"]:
                 yoy = round((agg["alloc_cr"] - agg["prev_cr"]) / agg["prev_cr"] * 100, 1)
-                updated[head] = {"alloc_cr": round(agg["alloc_cr"], 0), "yoy_pct": yoy, "_src": name}
+                updated[head] = {
+                    "alloc_cr": round(agg["alloc_cr"], 0),
+                    "yoy_pct": yoy,
+                    "_src": name,
+                }
                 break
 
     for head, vals in sorted(updated.items()):
-        print(f"    · {head}  ←  {vals['_src']}: ₹{vals['alloc_cr']:,.0f} cr ({vals['yoy_pct']:+.1f}% YoY)")
-    print(f"  matched {len(updated)}/{len(referenced)} referenced heads from {len(fetched)} fetched rows.")
+        print(
+            f"    · {head}  ←  {vals['_src']}: ₹{vals['alloc_cr']:,.0f} cr ({vals['yoy_pct']:+.1f}% YoY)"
+        )
+    print(
+        f"  matched {len(updated)}/{len(referenced)} referenced heads from {len(fetched)} fetched rows."
+    )
 
     if dry_run:
         print("  (dry-run) not written.")
         return 0
     if len(updated) < max(1, len(referenced) // 2):
-        print(f"  ✗ only {len(updated)}/{len(referenced)} heads matched; refusing to write "
-              "(align the crosswalk head names or the --field-*/--filter-* mapping)", file=sys.stderr)
+        print(
+            f"  ✗ only {len(updated)}/{len(referenced)} heads matched; refusing to write "
+            "(align the crosswalk head names or the --field-*/--filter-* mapping)",
+            file=sys.stderr,
+        )
         return 1
 
     for head, vals in updated.items():
-        pack["heads"].setdefault(head, {}).update({"alloc_cr": vals["alloc_cr"], "yoy_pct": vals["yoy_pct"]})
+        pack["heads"].setdefault(head, {}).update(
+            {"alloc_cr": vals["alloc_cr"], "yoy_pct": vals["yoy_pct"]}
+        )
     pack["fetched_at"] = date.today().isoformat()
     pack_path.write_text(json.dumps(pack, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"  ✓ {year}: refreshed {len(updated)} head(s) -> {pack_path.relative_to(_DATA_DIR.parent.parent.parent)}")
+    print(
+        f"  ✓ {year}: refreshed {len(updated)} head(s) -> {pack_path.relative_to(_DATA_DIR.parent.parent.parent)}"
+    )
     return 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Refresh the bundled Union-Budget sector pack.")
-    ap.add_argument("--year", default="2026-27", help="Budget year selecting data/budget_<year>.json")
-    ap.add_argument("--resource", default=None, help="data.gov.in OGD resource id for the expenditure dataset")
-    ap.add_argument("--field-head", default="department_or_ministry", help="record field: budget head / ministry name")
-    ap.add_argument("--field-alloc", default="budget_estimates_current", help="record field: current-year BE (₹ crore)")
-    ap.add_argument("--field-prev", default="budget_estimates_previous", help="record field: previous-year BE (₹ crore)")
-    ap.add_argument("--filter-field", default=None, help="keep only rows where this field == --filter-value (e.g. scheme)")
-    ap.add_argument("--filter-value", default=None, help="value for --filter-field (e.g. Total, for per-head totals)")
-    ap.add_argument("--dry-run", action="store_true", help="fetch and preview, but do not write the pack")
+    ap.add_argument(
+        "--year", default="2026-27", help="Budget year selecting data/budget_<year>.json"
+    )
+    ap.add_argument(
+        "--resource", default=None, help="data.gov.in OGD resource id for the expenditure dataset"
+    )
+    ap.add_argument(
+        "--field-head",
+        default="department_or_ministry",
+        help="record field: budget head / ministry name",
+    )
+    ap.add_argument(
+        "--field-alloc",
+        default="budget_estimates_current",
+        help="record field: current-year BE (₹ crore)",
+    )
+    ap.add_argument(
+        "--field-prev",
+        default="budget_estimates_previous",
+        help="record field: previous-year BE (₹ crore)",
+    )
+    ap.add_argument(
+        "--filter-field",
+        default=None,
+        help="keep only rows where this field == --filter-value (e.g. scheme)",
+    )
+    ap.add_argument(
+        "--filter-value",
+        default=None,
+        help="value for --filter-field (e.g. Total, for per-head totals)",
+    )
+    ap.add_argument(
+        "--dry-run", action="store_true", help="fetch and preview, but do not write the pack"
+    )
     args = ap.parse_args()
     fields = {"head": args.field_head, "alloc": args.field_alloc, "prev": args.field_prev}
-    row_filter = (args.filter_field, args.filter_value) if args.filter_field and args.filter_value else None
+    row_filter = (
+        (args.filter_field, args.filter_value) if args.filter_field and args.filter_value else None
+    )
     # Key comes from Settings, which reads BUDGET_API_KEY from the environment or the gitignored .env.
     api_key = get_settings().budget_api_key
     print(f"Refreshing budget pack {args.year} into {_DATA_DIR} ...")
