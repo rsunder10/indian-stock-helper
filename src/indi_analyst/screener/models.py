@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from indi_analyst.models import Action, Conviction, SectorMacroSignal
+from indi_analyst.models import Action, Conviction, MacroContribution, SectorMacroSignal
 
 # Bullish -> bearish, for min-conviction / action ordering comparisons.
 _CONVICTION_RANK = {Conviction.LOW: 0, Conviction.MEDIUM: 1, Conviction.HIGH: 2}
@@ -66,7 +66,14 @@ class ScreenRow(BaseModel):
     macro_points: float | None = (
         None  # combined macro nudge in score points (== quant.macro_adjustment)
     )
+    macro_tailwind: float | None = None  # mean normalized tailwind across fired overlays
+    macro_signal_count: int = 0  # number of government overlays that fired for this stock
+    macro_refreshed_count: int = 0  # fired overlays with a non-null pack refresh timestamp
+    macro_seed_count: int = 0  # fired overlays still carrying bundled seed data
     macro_signals: list[SectorMacroSignal] = Field(default_factory=list)  # every overlay that fired
+    macro_breakdown: list[MacroContribution] = Field(
+        default_factory=list
+    )  # per-source points + raw evidence for JSON/UI consumers
     budget_tailwind: float | None = None  # sector budget tailwind (-1..+1), None if unmapped
     budget_drivers: list[str] = Field(default_factory=list)  # plain-English budget drivers
 
@@ -103,6 +110,14 @@ class SectorSummary(BaseModel):
     drivers: list[str] = Field(
         default_factory=list
     )  # one plain-English driver per overlay that fired
+    overlay_tailwinds: dict[str, float] = Field(
+        default_factory=dict
+    )  # kind -> normalized tailwind, for heatmaps and exports
+    overlay_points: dict[str, float] = Field(
+        default_factory=dict
+    )  # kind -> uncapped per-source score points
+    refreshed_overlays: int = 0
+    seed_overlays: int = 0
 
 
 class ScanResult(BaseModel):
@@ -142,6 +157,9 @@ class ScreenFilter(BaseModel):
     min_rr: float | None = None
     min_upside: float | None = None  # min margin of safety vs fair value (fraction)
     min_macro_points: float | None = None  # min combined macro nudge in score points (e.g. 0.5)
+    min_macro_tailwind: float | None = None  # min mean normalized government tailwind (-1..+1)
+    min_macro_coverage: int | None = None  # minimum number of mapped government indicators
+    require_refreshed_macro: bool = False  # exclude rows with any seed/unrefreshed overlay
     trend: str | None = None  # e.g. "uptrend"
 
     def matches(self, row: ScreenRow) -> bool:
@@ -173,6 +191,15 @@ class ScreenFilter(BaseModel):
             # No macro overlays (e.g. unmapped/sectorless) fails a macro-tailwind floor.
             if row.macro_points is None or row.macro_points < self.min_macro_points:
                 return False
+        if self.min_macro_tailwind is not None:
+            if row.macro_tailwind is None or row.macro_tailwind < self.min_macro_tailwind:
+                return False
+        if self.min_macro_coverage is not None and row.macro_signal_count < self.min_macro_coverage:
+            return False
+        if self.require_refreshed_macro and (
+            row.macro_signal_count == 0 or row.macro_seed_count > 0
+        ):
+            return False
         return not (self.trend is not None and (row.trend or "").lower() != self.trend.lower())
 
 

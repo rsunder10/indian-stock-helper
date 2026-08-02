@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from indi_analyst.analysis.macro import macro_score_delta, resolve_macro_signals
+from indi_analyst.analysis.macro import (
+    macro_contributions,
+    macro_score_delta,
+    resolve_macro_signals,
+)
 from indi_analyst.analysis.scoring import score
 from indi_analyst.analysis.snapshot import build_snapshot
 from indi_analyst.backtest.replay import snapshot_at
@@ -53,6 +57,21 @@ def test_seed_macro_pack_status_is_visible_on_snapshot():
     snap = _snap_for_sector("Capital Goods")
     assert any(signal.fetched_at is None for signal in snap.macro_signals)
     assert any("unrefreshed seed data" in warning for warning in snap.warnings)
+
+
+def test_macro_contributions_keep_raw_evidence_and_per_source_points():
+    settings = _settings()
+    snap = _snap_for_sector("Capital Goods")
+    contributions = macro_contributions(snap.macro_signals, settings)
+
+    assert contributions
+    iip = next(c for c in contributions if c.kind == "iip")
+    assert iip.value == pytest.approx(3.5)
+    assert iip.neutral == pytest.approx(3.0)
+    assert iip.unit == "% YoY"
+    assert iip.sensitivity == pytest.approx(0.9)
+    assert iip.score_points == pytest.approx(iip.tailwind * settings.iip_max_points, abs=0.11)
+    assert iip.data_status == "seed/unrefreshed"
 
 
 def test_unmapped_sector_yields_no_signals():

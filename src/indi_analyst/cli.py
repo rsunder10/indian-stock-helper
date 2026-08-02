@@ -18,7 +18,7 @@ import argparse
 import sys
 
 from indi_analyst.analysis.engine import analyze
-from indi_analyst.analysis.macro import national_context
+from indi_analyst.analysis.macro import macro_contributions, national_context
 from indi_analyst.analysis.valuation import explain_valuation
 from indi_analyst.backtest import run_backtest
 from indi_analyst.backtest.models import BacktestResult, BacktestStats, Trade
@@ -146,13 +146,19 @@ def render(rec: Recommendation) -> str:
         lines.append("")
         adj = f"  (combined score {q.macro_adjustment:+.1f} pts)" if q.macro_adjustment else ""
         lines.append(f"MACRO OVERLAYS{adj}")
-        for sig in s.macro_signals:
-            freshness = f"refreshed {sig.fetched_at}" if sig.fetched_at else "seed/unrefreshed"
-            lines.append(
-                f"  {sig.label} · {sig.sector} · tailwind {sig.tailwind:+.2f} · {freshness}"
+        for contribution in macro_contributions(s.macro_signals, get_settings()):
+            reading = (
+                f"reading {contribution.value:+.1f} {contribution.unit}"
+                if contribution.value is not None
+                else "reading —"
             )
-            for d in sig.drivers:
-                lines.append(f"    · {d}")
+            freshness = contribution.data_status
+            lines.append(
+                f"  {contribution.label} · {contribution.sector} · {reading} · "
+                f"tailwind {contribution.tailwind:+.2f} · {contribution.score_points:+.1f} pts · {freshness}"
+            )
+            if contribution.driver:
+                lines.append(f"    · {contribution.driver}")
     lines.append("")
     lines.append("THESIS")
     for b in v.thesis:
@@ -184,8 +190,9 @@ def render(rec: Recommendation) -> str:
 def render_scan(result: ScanResult, rows: list, top: int | None) -> str:
     """A compact ranked table of scan rows (already filtered/ranked by the caller)."""
     shown = rows[:top] if top else rows
+    width = 124
     lines: list[str] = []
-    lines.append("=" * 96)
+    lines.append("=" * width)
     lines.append(
         f"SCREEN: {result.universe}   provider: {result.provider}   "
         f"scanned {result.ok_count} ok / {result.error_count} err   showing {len(shown)}"
@@ -193,20 +200,23 @@ def render_scan(result: ScanResult, rows: list, top: int | None) -> str:
     nat = national_context()
     if nat:
         lines.append("MACRO: " + "   ".join(nat))
-    lines.append("=" * 96)
+    lines.append("=" * width)
     header = (
-        f"{'#':>2}  {'SYMBOL':<14}{'ACTION':<11}{'CONV':<7}{'SCORE':>6}{'MACRO':>7}"
-        f"{'CLOSE':>11}{'R:R':>6}{'UPSIDE':>8}  SECTOR"
+        f"{'#':>2}  {'SYMBOL':<14}{'ACTION':<11}{'CONV':<7}{'SCORE':>6}"
+        f"{'M.TW':>7}{'M.OV':>5}{'M.RF':>5}{'M.PTS':>7}{'CLOSE':>11}{'R:R':>6}{'UPSIDE':>8}  SECTOR"
     )
     lines.append(header)
-    lines.append("-" * 96)
+    lines.append("-" * width)
     for i, r in enumerate(shown, 1):
         lines.append(
             f"{i:>2}  {r.symbol:<14}"
             f"{(r.action.value if r.action else '—'):<11}"
             f"{(r.conviction.value if r.conviction else '—'):<7}"
             f"{(f'{r.score:.0f}' if r.score is not None else '—'):>6}"
-            f"{(f'{r.macro_points:+.1f}' if r.macro_points else '—'):>7}"
+            f"{(f'{r.macro_tailwind:+.2f}' if r.macro_tailwind is not None else '—'):>7}"
+            f"{(str(r.macro_signal_count) if r.macro_signal_count else '—'):>5}"
+            f"{(str(r.macro_refreshed_count) if r.macro_refreshed_count else '—'):>5}"
+            f"{(f'{r.macro_points:+.1f}' if r.macro_points is not None else '—'):>7}"
             f"{(f'₹{r.last_close:,.0f}' if r.last_close is not None else '—'):>11}"
             f"{(f'{r.risk_reward:.1f}' if r.risk_reward is not None else '—'):>6}"
             f"{(_fmt_pct(r.margin_of_safety) if r.margin_of_safety is not None else '—'):>8}"
@@ -347,13 +357,26 @@ def _build_filter(args: argparse.Namespace) -> ScreenFilter | None:
         data["max_pe"] = args.max_pe
     if args.min_upside is not None:
         data["min_upside"] = args.min_upside
+    if args.min_macro_points is not None:
+        data["min_macro_points"] = args.min_macro_points
+    if args.min_macro_tailwind is not None:
+        data["min_macro_tailwind"] = args.min_macro_tailwind
+    if args.min_macro_coverage is not None:
+        data["min_macro_coverage"] = args.min_macro_coverage
+    if args.refreshed_macro_only:
+        data["require_refreshed_macro"] = True
     if args.action:
         data["actions"] = {Action(a.strip().upper()) for a in args.action.split(",")}
     if args.sector:
         data["sectors"] = {s.strip() for s in args.sector.split(",")}
     flt = ScreenFilter(**data)
     # An all-None filter means "no filter" — pass None so errored rows still drop cleanly.
-    return flt if flt.model_dump(exclude_none=True) else None
+    active = {
+        key: value
+        for key, value in flt.model_dump(exclude_none=True).items()
+        if value is not False
+    }
+    return flt if active else None
 
 
 def _cmd_analyze(args: argparse.Namespace) -> int:
@@ -387,7 +410,7 @@ def _cmd_screen(args: argparse.Namespace) -> int:
         print("", file=sys.stderr)  # end the progress line
 
     flt = _build_filter(args)
-    rows = rank(apply(result.rows, flt), by="score")
+    rows = rank(apply(result.rows, flt), by=args.rank_by)
 
     # Top-down sector view is built from the full scanned universe, not the filtered subset.
     sectors = summarize_sectors(result.ok_rows()) if args.sectors_summary else []
@@ -498,6 +521,43 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Minimum margin of safety vs fair value, e.g. 0.15 for +15%%.",
+    )
+    p_sc.add_argument(
+        "--min-macro-points",
+        type=float,
+        default=None,
+        help="Minimum combined government-data score nudge, e.g. 1.0.",
+    )
+    p_sc.add_argument(
+        "--min-macro-tailwind",
+        type=float,
+        default=None,
+        help="Minimum mean normalized government tailwind (-1..+1).",
+    )
+    p_sc.add_argument(
+        "--min-macro-coverage",
+        type=int,
+        default=None,
+        help="Minimum number of active/fired government indicators (0..8).",
+    )
+    p_sc.add_argument(
+        "--refreshed-macro-only",
+        action="store_true",
+        help="Keep only stocks whose mapped government overlays have refresh timestamps.",
+    )
+    p_sc.add_argument(
+        "--rank-by",
+        choices=[
+            "score",
+            "macro",
+            "macro_tailwind",
+            "risk_reward",
+            "change_pct",
+            "technical_score",
+            "fundamental_score",
+        ],
+        default="score",
+        help="Ranking field after filters (default: score).",
     )
     p_sc.add_argument("--action", default=None, help="Comma list, e.g. BUY,ACCUMULATE.")
     p_sc.add_argument("--sector", default=None, help="Comma list of sector substrings.")

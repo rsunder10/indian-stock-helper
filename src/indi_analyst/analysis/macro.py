@@ -26,7 +26,7 @@ from indi_analyst.analysis.overlays import (
 from indi_analyst.analysis.rates import resolve_rate_signal
 from indi_analyst.analysis.sector_match import clamp
 from indi_analyst.config import Settings, get_settings
-from indi_analyst.models import SectorMacroSignal
+from indi_analyst.models import MacroContribution, SectorMacroSignal
 
 # Registered resolvers, in a stable order. Each maps (sector, settings) -> signal | None. The two
 # bespoke overlays (budget, rate) come first; the generic national-indicator overlays follow, driven
@@ -61,6 +61,42 @@ def _per_source_cap(kind: str, settings: Settings) -> float:
     return float(getattr(settings, attr)) if attr else 0.0
 
 
+def macro_contributions(
+    signals: list[SectorMacroSignal], settings: Settings | None = None
+) -> list[MacroContribution]:
+    """Translate each fired overlay into its uncapped per-source score contribution.
+
+    This is the audit/visualization view of the same transform used by ``macro_score_delta``.
+    It intentionally does *not* apply the shared combined cap: callers can see which government
+    indicators supplied the evidence, while ``macro_score_delta`` remains the source of truth for
+    the final bounded score nudge.
+    """
+    settings = settings or get_settings()
+    out: list[MacroContribution] = []
+    for signal in signals:
+        cap = _per_source_cap(signal.kind, settings)
+        points = round(clamp(signal.tailwind * cap, -cap, cap), 1)
+        out.append(
+            MacroContribution(
+                kind=signal.kind,
+                label=signal.label,
+                sector=signal.sector,
+                tailwind=signal.tailwind,
+                score_points=points,
+                driver=signal.drivers[0] if signal.drivers else None,
+                value=signal.value,
+                neutral=signal.neutral,
+                unit=signal.unit,
+                sensitivity=signal.sensitivity,
+                as_of=signal.as_of,
+                fetched_at=signal.fetched_at,
+                data_status="refreshed" if signal.fetched_at else "seed/unrefreshed",
+                citations=list(signal.citations),
+            )
+        )
+    return out
+
+
 def macro_score_delta(
     signals: list[SectorMacroSignal], settings: Settings | None = None
 ) -> tuple[float, list[str]]:
@@ -73,15 +109,14 @@ def macro_score_delta(
     settings = settings or get_settings()
     reasons: list[str] = []
     raw = 0.0
-    for s in signals:
-        cap = _per_source_cap(s.kind, settings)
-        d = round(clamp(s.tailwind * cap, -cap, cap), 1)
+    for contribution in macro_contributions(signals, settings):
+        d = contribution.score_points
         if abs(d) < 0.05:
             continue
         raw += d
         word = "tailwind" if d > 0 else "headwind"
-        driver = s.drivers[0] if s.drivers else s.sector
-        reasons.append(f"{d:+.1f} pts — {s.label} sector {word}: {driver}.")
+        driver = contribution.driver or contribution.sector
+        reasons.append(f"{d:+.1f} pts — {contribution.label} sector {word}: {driver}.")
 
     total = round(clamp(raw, -settings.macro_max_points, settings.macro_max_points), 1)
     if abs(total) < 0.05:

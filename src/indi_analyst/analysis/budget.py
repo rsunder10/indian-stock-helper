@@ -96,7 +96,8 @@ def resolve_budget_signal(
         return None
 
     scale = settings.budget_yoy_scale or 20.0
-    tailwind = clamp((sum(yoys) / len(yoys)) / scale, -1.0, 1.0)
+    average_yoy = sum(yoys) / len(yoys)
+    tailwind = clamp(average_yoy / scale, -1.0, 1.0)
 
     # Drivers: strongest heads first, each an auditable one-liner.
     ranked = sorted(present, key=lambda hp: hp[1].get("yoy_pct", 0.0), reverse=True)
@@ -121,4 +122,7 @@ def resolve_budget_signal(
         citations=citations,
         as_of=budget_year,
         fetched_at=pack.get("fetched_at"),
+        value=round(average_yoy, 1),
+        neutral=0.0,
+        unit="% YoY",
     )

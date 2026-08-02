@@ -11,6 +11,7 @@ _RANK_KEYS = {
     "technical_score": lambda r: r.technical_score,
     "fundamental_score": lambda r: r.fundamental_score,
     "macro": lambda r: r.macro_points,
+    "macro_tailwind": lambda r: r.macro_tailwind,
 }
 
 

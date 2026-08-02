@@ -128,6 +128,27 @@ def test_build_filter_from_preset():
     assert flt is not None
 
 
+def test_build_filter_supports_government_data_screening():
+    flt = cli._build_filter(
+        _screen_args(
+            "--min-macro-points",
+            "1.5",
+            "--min-macro-tailwind",
+            "0.25",
+            "--min-macro-coverage",
+            "3",
+            "--refreshed-macro-only",
+            "--rank-by",
+            "macro_tailwind",
+        )
+    )
+    assert flt is not None
+    assert flt.min_macro_points == 1.5
+    assert flt.min_macro_tailwind == 0.25
+    assert flt.min_macro_coverage == 3
+    assert flt.require_refreshed_macro is True
+
+
 # --- main() dispatch --------------------------------------------------------
 
 

@@ -34,6 +34,8 @@ configured ones appear), choose a history window, and press **Analyze**. You get
 - Header metrics: last close, RSI, trend, 52-week position
 - A **recommendation card**: action, conviction, score, entry zone, stop, T1/T2, risk-reward
 - A **price chart**: candlesticks + SMAs + Bollinger, with RSI and MACD subplots
+- A **government-data lens**: per-indicator contribution bars plus a raw-reading, baseline,
+  sensitivity, freshness, and source table
 - Thesis, key risks, catalysts, a plain-English gist
 - Expandable fundamentals table and recent news (with sentiment)
 
@@ -154,6 +156,13 @@ across all overlays is capped by `MACRO_MAX_POINTS` (default ±6) — a convicti
 timing signal, always `0` for an unmapped sector. See
 [methodology.md](methodology.md#macro-overlays) for the transforms.
 
+For a mapped stock, the JSON and dashboard retain more detail than the final score: `value` and
+`unit` are the government headline, `neutral` is the baseline, `sensitivity` is the maintained
+sector exposure, `tailwind` is normalized to −1..+1, and `score_points` is the per-source capped
+contribution. `fetched_at` distinguishes refreshed data from bundled `seed/unrefreshed` data. The
+per-source points may sum to more than the final `macro_adjustment` when the shared ±6 cap binds;
+that difference is intentional and visible.
+
 The packs ship with the package and the runtime is fully offline. Refresh them at build time (a free
 data.gov.in OGD key in `BUDGET_API_KEY` is shared by both scripts):
 
@@ -181,12 +190,23 @@ the same crosswalk, point `--resource`/`--field-*` at it, and set `BUDGET_YEAR`.
 Top-down, the screener answers *which sector*: `--sectors-summary` prepends a **SECTOR MACRO TAILWINDS**
 table (sectors ranked by the *combined* tailwind across all overlays, with the number of overlays that
 fired, average score, and top names), so the workflow is rank sectors → drill in with
-`--sector "<name>"` → pick the accumulate candidates. The scan table's `MACRO` column shows each
-stock's combined macro points, and `min_macro_points` / `rank by="macro"` filter and sort on it:
+`--sector "<name>"` → pick the accumulate candidates. The scan table's `M.TW`, `M.OV`, `M.RF`, and
+`M.PTS` columns show each stock's mean government tailwind, active-indicator coverage, refreshed
+coverage, and combined macro points. Use
+`min_macro_points` / `min_macro_tailwind` / `min_macro_coverage` to separate score impact, signal
+strength, and breadth; `--refreshed-macro-only` excludes seed packs. `--rank-by` supports
+`score`, `macro`, `macro_tailwind`, `risk_reward`, `technical_score`, and `fundamental_score`:
 
 ```bash
-uv run indi-analyst screen --universe nifty200 --sectors-summary --provider rulebased
+uv run indi-analyst screen --universe nifty200 --sectors-summary --provider rulebased \
+  --min-macro-tailwind 0.20 --min-macro-coverage 3 --refreshed-macro-only \
+  --rank-by macro_tailwind
 ```
+
+In the dashboard, the same scan produces a **sector × indicator heatmap** and a **stock-level map**
+of mean government tailwind versus composite score; marker size shows how many indicators fired for
+the stock. Treat the upper-right quadrant as a research queue, then open the stock deep dive to
+inspect the raw readings and citations.
 
 ---
 
@@ -255,8 +275,9 @@ uv run python scripts/refresh_universes.py
 
 **Filters** — `--preset` (`high-conviction-buys`, `oversold-quality`,
 `breakout-with-fundamentals`), then narrow further with `--min-score`, `--min-rr`, `--max-pe`,
-`--min-upside` (min margin of safety vs fair value), `--action BUY,ACCUMULATE`,
-`--sector "Information Technology,Energy"`. `--top N` limits rows shown (`--top 0` = all);
+`--min-upside` (min margin of safety vs fair value), `--min-macro-points`,
+`--min-macro-tailwind`, `--min-macro-coverage`, `--refreshed-macro-only`,
+`--action BUY,ACCUMULATE`, `--sector "Information Technology,Energy"`. `--top N` limits rows shown (`--top 0` = all);
 `--limit N` caps how many constituents get scanned. `--sectors-summary` prepends a top-down
 budget-tailwind ranking of the scanned sectors (see [Macro overlays](#macro-overlays-government-open-data)).
 

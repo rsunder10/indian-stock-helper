@@ -101,6 +101,36 @@ class SectorMacroSignal(BaseModel):
     fetched_at: str | None = (
         None  # pack refresh date; None means the bundled value is unrefreshed/seed data
     )
+    # Evidence fields keep the headline government reading visible alongside the normalized
+    # signal. They are optional for backwards-compatible custom packs and older cached snapshots.
+    value: float | None = None  # source headline value, in `unit`
+    neutral: float | None = None  # baseline that produces a zero normalized signal
+    unit: str | None = None  # e.g. "% YoY", "% vs LPA", "% repo"
+    sensitivity: float | None = None  # maintained sector exposure weight, usually -1..+1
+
+
+class MacroContribution(BaseModel):
+    """One government-data signal translated into score points for explanation and visuals.
+
+    `score_points` is deliberately derived using the configured per-source cap, while the
+    snapshot retains the normalized `tailwind` and raw headline evidence. The final combined
+    nudge can still be lower when the shared macro cap binds.
+    """
+
+    kind: str
+    label: str
+    sector: str
+    tailwind: float
+    score_points: float
+    driver: str | None = None
+    value: float | None = None
+    neutral: float | None = None
+    unit: str | None = None
+    sensitivity: float | None = None
+    as_of: str | None = None
+    fetched_at: str | None = None
+    data_status: str = "seed/unrefreshed"
+    citations: list[str] = Field(default_factory=list)
 
 
 class TechnicalSignals(BaseModel):

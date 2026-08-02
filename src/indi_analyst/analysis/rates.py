@@ -123,4 +123,8 @@ def resolve_rate_signal(
         citations=[pack["source"]] if pack.get("source") else [],
         as_of=as_of,
         fetched_at=pack.get("fetched_at"),
+        value=float(repo) if repo is not None else None,
+        neutral=None,  # rate direction is regime-based, not a numeric baseline transform
+        unit="% repo",
+        sensitivity=sensitivity,
     )

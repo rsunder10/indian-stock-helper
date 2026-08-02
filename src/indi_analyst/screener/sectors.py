@@ -47,11 +47,23 @@ def summarize_sectors(rows: list[ScreenRow], *, top_symbols: int = 3) -> list[Se
             macro_tailwind = round(sum(s.tailwind for s in signals) / len(signals), 3)
             overlays = [s.label for s in signals]
             drivers = [s.drivers[0] for s in signals if s.drivers]
+            overlay_tailwinds = {s.kind: round(s.tailwind, 3) for s in signals}
+            overlay_points = {
+                contribution.kind: contribution.score_points
+                for row in ranked
+                for contribution in row.macro_breakdown
+            }
+            refreshed_overlays = sum(1 for s in signals if s.fetched_at)
+            seed_overlays = sum(1 for s in signals if not s.fetched_at)
         else:  # older cached rows: fall back to the single budget field
             tailwinds = [r.budget_tailwind for r in ranked if r.budget_tailwind is not None]
             macro_tailwind = tailwinds[0] if tailwinds else None
             overlays = []
             drivers = next((r.budget_drivers for r in ranked if r.budget_drivers), [])
+            overlay_tailwinds = {"budget": tailwinds[0]} if tailwinds else {}
+            overlay_points = {}
+            refreshed_overlays = 0
+            seed_overlays = 0
 
         budget_tw = next(
             (s.tailwind for s in signals if s.kind == "budget"),
@@ -67,6 +79,10 @@ def summarize_sectors(rows: list[ScreenRow], *, top_symbols: int = 3) -> list[Se
                 avg_score=round(sum(scores) / len(scores), 1),
                 top_symbols=[r.symbol for r in ranked[:top_symbols]],
                 drivers=list(drivers),
+                overlay_tailwinds=overlay_tailwinds,
+                overlay_points=overlay_points,
+                refreshed_overlays=refreshed_overlays,
+                seed_overlays=seed_overlays,
             )
         )
 

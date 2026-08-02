@@ -362,6 +362,60 @@ def test_min_macro_points_filter_and_macro_rank():
     assert [r.symbol for r in ranked] == ["STRONG.NS", "WEAK.NS"]
 
 
+def test_macro_coverage_tailwind_and_refresh_filters():
+    from indi_analyst.models import SectorMacroSignal as S
+
+    refreshed = _macro_row(
+        "REFRESHED.NS",
+        70,
+        "Capital Goods",
+        [
+            S(
+                kind="budget",
+                label="Budget",
+                sector="Capital Goods",
+                tailwind=0.8,
+                fetched_at="2026-07-30",
+            ),
+            S(
+                kind="iip",
+                label="IIP",
+                sector="Capital Goods",
+                tailwind=0.4,
+                fetched_at="2026-07-30",
+            ),
+        ],
+    )
+    refreshed.macro_tailwind = 0.6
+    refreshed.macro_signal_count = 2
+    refreshed.macro_refreshed_count = 2
+    refreshed.macro_seed_count = 0
+
+    seed = _macro_row(
+        "SEED.NS",
+        68,
+        "Capital Goods",
+        [S(kind="budget", label="Budget", sector="Capital Goods", tailwind=0.8)],
+    )
+    seed.macro_tailwind = 0.8
+    seed.macro_signal_count = 1
+    seed.macro_seed_count = 1
+
+    kept = apply(
+        [refreshed, seed],
+        ScreenFilter(
+            min_macro_tailwind=0.5,
+            min_macro_coverage=2,
+            require_refreshed_macro=True,
+        ),
+    )
+    assert [row.symbol for row in kept] == ["REFRESHED.NS"]
+    assert [row.symbol for row in rank([seed, refreshed], by="macro_tailwind")] == [
+        "SEED.NS",
+        "REFRESHED.NS",
+    ]
+
+
 # --- Cache round-trip + temporal diff --------------------------------------
 
 

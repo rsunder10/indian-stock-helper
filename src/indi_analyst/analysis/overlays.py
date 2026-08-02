@@ -228,4 +228,8 @@ def resolve_overlay_signal(
         citations=[pack["source"]] if pack.get("source") else [],
         as_of=as_of,
         fetched_at=pack.get("fetched_at"),
+        value=value,
+        neutral=neutral,
+        unit=unit,
+        sensitivity=sensitivity,
     )

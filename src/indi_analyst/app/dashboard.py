@@ -11,7 +11,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from indi_analyst.analysis.engine import analyze
-from indi_analyst.analysis.macro import national_context
+from indi_analyst.analysis.macro import macro_contributions, national_context
 from indi_analyst.analysis.valuation import explain_valuation
 from indi_analyst.backtest import run_backtest
 from indi_analyst.backtest.models import BacktestResult, BacktestStats
@@ -157,6 +157,133 @@ def _price_chart(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def _macro_contribution_chart(contributions: list) -> go.Figure:
+    """Show how each government indicator translated into the bounded score nudge."""
+    labels = [f"{c.kind.upper()} · {c.label}" for c in contributions]
+    points = [c.score_points for c in contributions]
+    colors = ["#16a34a" if p >= 0 else "#dc2626" for p in points]
+    customdata = [
+        [
+            c.value,
+            c.unit or "",
+            c.neutral,
+            c.tailwind,
+            c.sensitivity,
+            c.data_status,
+            c.as_of or "—",
+        ]
+        for c in contributions
+    ]
+    fig = go.Figure(
+        go.Bar(
+            x=points,
+            y=labels,
+            orientation="h",
+            marker_color=colors,
+            customdata=customdata,
+            hovertemplate=(
+                "<b>%{y}</b><br>Score contribution: %{x:+.1f} pts"
+                "<br>Reading: %{customdata[0]} %{customdata[1]}"
+                "<br>Baseline: %{customdata[2]}"
+                "<br>Normalized tailwind: %{customdata[3]:+.2f}"
+                "<br>Sector sensitivity: %{customdata[4]}"
+                "<br>Period: %{customdata[6]} · %{customdata[5]}<extra></extra>"
+            ),
+        )
+    )
+    fig.add_vline(x=0, line_color="#475569", line_width=1)
+    fig.update_layout(
+        title="Government-data contribution to score",
+        height=max(260, 48 * len(contributions) + 100),
+        margin={"l": 10, "r": 20, "t": 55, "b": 10},
+        template="plotly_white",
+        xaxis_title="Per-source contribution (points; shared cap may reduce the final total)",
+        yaxis={"autorange": "reversed"},
+    )
+    return fig
+
+
+def _macro_heatmap(summaries: list) -> go.Figure | None:
+    """Render sector × government-indicator normalized tailwinds for top-down screening."""
+    usable = [s for s in summaries if s.overlay_tailwinds]
+    if not usable:
+        return None
+    kinds = sorted({kind for s in usable for kind in s.overlay_tailwinds})
+    z = [[s.overlay_tailwinds.get(kind) for kind in kinds] for s in usable]
+    text = [["—" if value is None else f"{value:+.2f}" for value in row] for row in z]
+    fig = go.Figure(
+        go.Heatmap(
+            z=z,
+            x=[kind.upper() for kind in kinds],
+            y=[s.sector for s in usable],
+            text=text,
+            texttemplate="%{text}",
+            colorscale=[[0.0, "#dc2626"], [0.5, "#f8fafc"], [1.0, "#16a34a"]],
+            zmin=-1,
+            zmax=1,
+            colorbar={"title": "Tailwind"},
+            hovertemplate="Sector: %{y}<br>Indicator: %{x}<br>Tailwind: %{z:+.2f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title="Sector × government-indicator map",
+        height=max(320, 34 * len(usable) + 120),
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        template="plotly_white",
+    )
+    return fig
+
+
+def _macro_scatter(rows: list) -> go.Figure | None:
+    """Show the stock-level trade-off between macro tailwind and the total score."""
+    usable = [r for r in rows if r.score is not None and r.macro_tailwind is not None]
+    if not usable:
+        return None
+    action_colors = {
+        Action.BUY: "#16a34a",
+        Action.ACCUMULATE: "#65a30d",
+        Action.HOLD: "#ca8a04",
+        Action.AVOID: "#ea580c",
+        Action.SELL: "#dc2626",
+    }
+    counts = [r.macro_signal_count or len(r.macro_signals) for r in usable]
+    fig = go.Figure(
+        go.Scatter(
+            x=[r.macro_tailwind for r in usable],
+            y=[r.score for r in usable],
+            mode="markers+text",
+            text=[r.symbol.replace(".NS", "") for r in usable],
+            textposition="top center",
+            marker={
+                "size": [10 + 2 * min(count, 8) for count in counts],
+                "color": [action_colors.get(r.action, "#64748b") for r in usable],
+                "opacity": 0.82,
+                "line": {"width": 1, "color": "white"},
+            },
+            customdata=[
+                [r.action.value if r.action else "—", count, r.macro_points]
+                for r, count in zip(usable, counts, strict=True)
+            ],
+            hovertemplate=(
+                "<b>%{text}</b><br>Score: %{y:.1f}<br>Mean macro tailwind: %{x:+.2f}"
+                "<br>Mapped indicators: %{customdata[1]}<br>Macro points: %{customdata[2]:+.1f}"
+                "<br>Action: %{customdata[0]}<extra></extra>"
+            ),
+        )
+    )
+    fig.add_vline(x=0, line_color="#94a3b8", line_dash="dash")
+    fig.add_hline(y=50, line_color="#94a3b8", line_dash="dash")
+    fig.update_layout(
+        title="Stock map: government tailwind vs composite score",
+        height=430,
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        template="plotly_white",
+        xaxis_title="Mean normalized government tailwind",
+        yaxis_title="Composite score",
+    )
+    return fig
+
+
 def _recommendation_card(rec: Recommendation) -> None:
     color = _ACTION_COLOR.get(rec.action, "#334155")
     st.markdown(
@@ -209,24 +336,47 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
 
     _recommendation_card(rec)
 
-    if s.macro_signals:
-        adj = (
-            f" · combined score {rec.quant.macro_adjustment:+.1f} pts"
-            if rec.quant.macro_adjustment
-            else ""
-        )
-        st.markdown(f"**Macro overlays**{adj}")
+    with st.expander("🏛️ Government-data lens", expanded=True):
         nat = national_context()
         if nat:
-            st.caption("🏦 Macro backdrop  ·  " + "   ·   ".join(nat))
-        for m in s.macro_signals:
-            icon = "🟢" if m.tailwind > 0 else "🔴" if m.tailwind < 0 else "⚪"
-            freshness = f"refreshed {m.fetched_at}" if m.fetched_at else "seed/unrefreshed"
-            st.markdown(
-                f"{icon} **{m.label}** — {m.sector} · tailwind {m.tailwind:+.2f} · {freshness}"
+            st.caption("National backdrop  ·  " + "   ·   ".join(nat))
+        contributions = macro_contributions(s.macro_signals, get_settings())
+        if contributions:
+            refreshed = sum(1 for c in contributions if c.fetched_at)
+            st.caption(
+                f"{len(contributions)} active indicators · {refreshed} refreshed · "
+                f"combined score nudge {rec.quant.macro_adjustment:+.1f} pts. "
+                "Green bars are tailwinds; red bars are headwinds."
             )
-            if m.drivers:
-                st.caption("  ·  ".join(m.drivers))
+            st.plotly_chart(_macro_contribution_chart(contributions), width="stretch")
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Indicator": c.label,
+                            "Government reading": (
+                                f"{c.value:+.1f} {c.unit}" if c.value is not None else "—"
+                            ),
+                            "Baseline": c.neutral,
+                            "Tailwind": c.tailwind,
+                            "Score pts": c.score_points,
+                            "Sensitivity": c.sensitivity,
+                            "Period": c.as_of or "—",
+                            "Data status": c.data_status,
+                            "Source": c.citations[0] if c.citations else "—",
+                        }
+                        for c in contributions
+                    ]
+                ),
+                width="stretch",
+                hide_index=True,
+            )
+            st.caption(
+                "The headline reading is national; the sector sensitivity is a maintained "
+                "crosswalk. This is context for conviction, not a company forecast."
+            )
+        else:
+            st.info("No government-data overlay is mapped to this stock's sector.")
 
     left, right = st.columns([2, 1])
     with left:
@@ -387,6 +537,39 @@ def _screener_view(settings: Settings, provider: str) -> None:
             step=5,
             help="Margin of safety vs fair value, %. -50 = no filter.",
         )
+        min_macro_tailwind = st.slider(
+            "Min government tailwind",
+            -100,
+            100,
+            -100,
+            step=5,
+            help="Mean normalized tailwind across mapped government indicators; -100 = no filter.",
+        )
+        min_macro_coverage = st.slider(
+            "Min government indicators",
+            0,
+            8,
+            0,
+            step=1,
+            help="Require this many sector-keyed government indicators to be active/fired.",
+        )
+        refreshed_macro_only = st.checkbox(
+            "Refreshed government data only",
+            value=False,
+            help="Exclude any stock whose mapped overlay is still a seed/unrefreshed pack.",
+        )
+        rank_by = st.selectbox(
+            "Rank by",
+            ["score", "macro_tailwind", "macro", "risk_reward", "technical_score", "fundamental_score"],
+            format_func=lambda value: {
+                "score": "Composite score",
+                "macro_tailwind": "Government tailwind",
+                "macro": "Government score points",
+                "risk_reward": "Risk : Reward",
+                "technical_score": "Technical score",
+                "fundamental_score": "Fundamental score",
+            }[value],
+        )
         scan_btn = st.button("Run scan", type="primary", width="stretch")
 
     if scan_btn:
@@ -404,8 +587,16 @@ def _screener_view(settings: Settings, provider: str) -> None:
         flt = ScreenFilter(**{**flt.model_dump(), "min_score": float(min_score)})
     if min_upside > -50:
         flt = ScreenFilter(**{**flt.model_dump(), "min_upside": min_upside / 100})
+    if min_macro_tailwind > -100:
+        flt = ScreenFilter(
+            **{**flt.model_dump(), "min_macro_tailwind": min_macro_tailwind / 100}
+        )
+    if min_macro_coverage:
+        flt = ScreenFilter(**{**flt.model_dump(), "min_macro_coverage": min_macro_coverage})
+    if refreshed_macro_only:
+        flt = ScreenFilter(**{**flt.model_dump(), "require_refreshed_macro": True})
     active = flt if flt.model_dump(exclude_none=True) else None
-    rows = rank(apply(result.rows, active), by="score")
+    rows = rank(apply(result.rows, active), by=rank_by)
 
     st.subheader(f"{result.universe} — {len(rows)} ideas")
     st.caption(
@@ -446,6 +637,18 @@ def _screener_view(settings: Settings, provider: str) -> None:
                 width="stretch",
                 hide_index=True,
             )
+            heatmap = _macro_heatmap(sectors)
+            if heatmap is not None:
+                st.plotly_chart(heatmap, width="stretch")
+
+    scatter = _macro_scatter(rows)
+    if scatter is not None:
+        with st.expander("📊 Stock-level government-data map", expanded=True):
+            st.caption(
+                "Look for names in the upper-right: stronger composite score and a positive "
+                "government tailwind. Marker size indicates active-indicator coverage."
+            )
+            st.plotly_chart(scatter, width="stretch")
 
     if not rows:
         st.info("No rows matched the filter. Loosen the preset or min-score.")
@@ -459,7 +662,10 @@ def _screener_view(settings: Settings, provider: str) -> None:
             "Score": r.score,
             "Tech": r.technical_score,
             "Fund": r.fundamental_score,
-            "Macro": r.macro_points,
+            "Gov tailwind": r.macro_tailwind,
+            "Gov indicators": r.macro_signal_count or len(r.macro_signals),
+            "Gov refreshed": r.macro_refreshed_count,
+            "Macro pts": r.macro_points,
             "Close": r.last_close,
             "Fair value": r.fair_value,
             "Upside": r.margin_of_safety,

@@ -12,6 +12,9 @@ facts-based "why to invest" thesis.
   or a **rule-based** engine with no LLM at all.
 - **Never a hard dependency on one model.** If a provider is missing or unreachable, the tool
   transparently falls back to rule-based analysis.
+- **Government-data evidence, not a black-box macro score.** Union Budget, RBI rates, IIP, GST,
+  credit, exports, WPI/input costs, and monsoon packs show their raw reading, sector exposure,
+  freshness, and score contribution; the dashboard adds sector heatmaps and stock screening maps.
 
 > ⚠️ For research and educational purposes only. **Not investment advice.**
 
@@ -58,7 +61,7 @@ ticker
   → data (yfinance OHLCV + fundamentals, Google News RSS + VADER sentiment)
   → technical indicators (RSI, MACD, SMAs, Bollinger, ADX, ATR, S/R, trend)
   → StockSnapshot  ── the single deterministic source of truth
-  → trade levels (ATR stop + risk-reward targets)  +  quant score (technical + fundamental)
+  → trade levels (ATR stop + risk-reward targets)  +  quant score (technical + fundamental + bounded government-data context)
   → LLMProvider.verdict()  ── narrative, risks, catalysts (or rule-based)
   → Recommendation  ── rendered in the dashboard / CLI
 ```
@@ -113,7 +116,7 @@ src/indi_analyst/
 ├── models.py            # StockSnapshot, TradeLevels, QuantScore, AnalystVerdict, Recommendation
 ├── datasources/         # yfinance (prices+fundamentals), Google News RSS; source protocols
 ├── indicators/          # technical.py — RSI/MACD/SMA/Bollinger/ADX/ATR/S-R (pure pandas/numpy)
-├── analysis/            # snapshot, levels, scoring, engine
+├── analysis/            # snapshot, levels, scoring, engine, government-data overlays
 ├── llm/                 # base protocol, prompts, factory, + ollama/anthropic/openai/gemini/rulebased
 ├── app/dashboard.py     # Streamlit UI
 └── cli.py               # `indi-analyst <ticker>`

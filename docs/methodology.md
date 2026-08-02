@@ -222,6 +222,16 @@ the 50-centred scale — and the action cutoffs (68/57/45/35) — intact. Every 
 appends a human-readable `reasons` line (e.g. *"+5.0 pts — Union Budget 2023-24 sector tailwind:
 Railways outlay +75% YoY"*); `QuantScore.macro_adjustment` exposes the exact combined points.
 
+**Evidence, not just a score.** A resolved `SectorMacroSignal` also carries the raw government
+headline `value`, its `neutral` baseline, display `unit`, sector `sensitivity`, period `as_of`, and
+pack `fetched_at`. `macro_contributions()` applies the per-source cap and returns the exact
+per-indicator points used for explanation. The per-source bars are intentionally shown before the
+shared cap; the final `macro_adjustment` remains the authoritative total. A null `fetched_at` is
+explicitly `seed/unrefreshed`, so a strong-looking tailwind can be screened out until its input is
+refreshed. This separation lets an analyst answer four different questions: what did the government
+series read, how far was it from baseline, how exposed is the sector, and how many score points did
+that evidence contribute?
+
 ### Budget overlay (`analysis/budget.py`)
 
 The Union Budget's allocation by head (Defence, Railways, Green energy, Housing, …). Pack
@@ -298,6 +308,24 @@ The overlays also feed the **narrative**: the rule-based verdict adds each posit
 catalyst (and each negative one as a headwind risk), and the LLM prompt receives a `macro_overlays`
 block it must treat as macro context, never as per-company numbers. Every parameter is tunable in
 `config.py` / `.env`; each overlay has its own `*_ENABLED` switch.
+
+### Visual and screening interpretation
+
+The dashboard uses the same deterministic fields in three complementary views:
+
+- **Government-data lens:** a per-stock contribution chart and evidence table show the raw reading,
+  baseline, normalized tailwind, sensitivity, score points, period, refresh status, and source.
+- **Sector heatmap:** the screener compares sectors by indicator, so a high combined tailwind is not
+  mistaken for broad agreement when only one overlay fired.
+- **Stock map:** each screened name is plotted by mean government tailwind versus composite score;
+  marker size represents mapped-indicator coverage. Names in the upper-right are candidates for
+  further research, not automatic buys.
+
+The screener exposes three distinct macro controls: `min_macro_points` filters the bounded score
+nudge, `min_macro_tailwind` filters the mean normalized sector signal, and `min_macro_coverage`
+requires a minimum number of mapped indicators. `require_refreshed_macro` / `--refreshed-macro-only`
+excludes any row with a seed overlay. These controls keep data breadth, data freshness, and score
+impact separate rather than hiding them in one opaque ranking.
 
 ---
 

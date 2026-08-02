@@ -99,8 +99,9 @@ breakage on Python 3.13 and keeps the math auditable. See
   numbers, no LLM involved, so it's instant and can never contradict the figures it explains.
 - **`macro.py`** — the **macro-overlay framework**: runs every registered sector-keyed
   government-open-data resolver over a stock's sector and combines their point deltas under one shared
-  cap (`resolve_macro_signals` → `list[SectorMacroSignal]`; `macro_score_delta` → the combined capped
-  delta `scoring.py` applies). Adding a new dataset = a resolver + pack, registered here.
+  cap (`resolve_macro_signals` → `list[SectorMacroSignal]`; `macro_contributions` → per-source audit
+  rows; `macro_score_delta` → the combined capped delta `scoring.py` applies). Adding a new dataset = a
+  resolver + pack, registered here.
   `national_context()` returns the sector-independent macro strip (repo/regime, CPI, every headline).
   - **`budget.py`** — Union-Budget allocation overlay (pack `data/budget_<year>.json`).
   - **`rates.py`** — RBI rate-cycle overlay (pack `data/rates_<version>.json`; easing/tightening ×
@@ -148,8 +149,9 @@ replay of the real pipeline over history:
 ### 6. Interfaces
 
 - **`app/dashboard.py`** — Streamlit: ticker input, provider selector, candlestick + RSI/MACD
-  charts (Plotly), fundamentals, news, a recommendation card, a per-stock **Macro overlays** panel,
-  and a **Sector macro tailwinds** table (plus a national macro strip) in Screener mode.
+  charts (Plotly), fundamentals, news, a recommendation card, a per-stock government-data evidence
+  chart/table, a sector × indicator heatmap, and a stock macro-vs-score map in Screener mode (plus a
+  national macro strip).
 - **`cli.py`** — `indi-analyst <ticker> [--provider ...]`, a rich terminal report (incl. a `MACRO
   OVERLAYS` block). Also the quickest way to smoke-test the pipeline. Subcommands `screen` (with an
   optional top-down `--sectors-summary` ranking) and `backtest` reuse the same core.
@@ -162,13 +164,14 @@ replay of the real pipeline over history:
 | --- | --- |
 | `Fundamentals` | P/E, P/B, P/S, ROE, D/E, margins, growth, EPS, book value/sh, dividend rate, next results date, sector… (all optional — free data is patchy) |
 | `CorporateActions` | Free dividend/split history — paying-years count over a lookback window, last dividend, last split ratio/date, `recent_split` flag (optional; `None` when the source has no action history) |
-| `SectorMacroSignal` | A sector-keyed macro overlay (`kind` = budget / rate / …) — normalized −1..+1 `tailwind`, plain-English drivers, source citations, `as_of`, and pack `fetched_at` (one per firing overlay; none when the sector is unmapped or the pack is absent/disabled) |
+| `SectorMacroSignal` | A sector-keyed macro overlay (`kind` = budget / rate / …) — normalized −1..+1 `tailwind`, raw reading/baseline/unit/sensitivity, plain-English drivers, source citations, `as_of`, and pack `fetched_at` (one per firing overlay; none when the sector is unmapped or the pack is absent/disabled) |
+| `MacroContribution` | Per-source score-point translation of a `SectorMacroSignal`, including the data-status label and raw evidence used by CLI JSON and dashboard visuals |
 | `TechnicalSignals` | Latest-bar indicators + trend/level context |
 | `NewsItem` | Headline + VADER sentiment |
 | `StockSnapshot` | **The deterministic source of truth** — everything above, plus `corporate_actions`, `macro_signals` (with a `budget_signal` convenience accessor), warnings, and `data_source` / `data_as_of` provenance |
 | `TradeLevels` | Entry band, stop, T1/T2, risk-reward |
 | `Valuation` | Blended fair value, low/high range, margin of safety, rating + per-method breakdown |
-| `QuantScore` | Action, conviction, 0–100 score + component scores + `macro_adjustment` + reasons |
+| `QuantScore` | Action, conviction, 0–100 score + component scores + bounded `macro_adjustment` + reasons |
 | `AnalystVerdict` | The LLM's structured output: thesis, risks, catalysts, summary |
 | `Recommendation` | Final merged object the UI renders |
 

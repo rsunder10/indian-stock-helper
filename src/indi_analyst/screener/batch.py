@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from hashlib import sha256
 
 from indi_analyst.analysis.engine import analyze_snapshot
+from indi_analyst.analysis.macro import macro_contributions
 from indi_analyst.analysis.snapshot import DEFAULT_NEWS_SOURCE, build_snapshot
 from indi_analyst.config import Settings, get_settings
 from indi_analyst.datasources.base import NewsSource, PriceSource
@@ -77,10 +78,14 @@ def _snapshot_cache_key(
     return sha256("\x1f".join(material).encode("utf-8")).hexdigest()[:20]
 
 
-def _row_from_recommendation(c: Constituent, rec: Recommendation) -> ScreenRow:
+def _row_from_recommendation(
+    c: Constituent, rec: Recommendation, settings: Settings
+) -> ScreenRow:
     t = rec.snapshot.technicals
     lv = rec.levels
     bud = rec.snapshot.budget_signal
+    macro = macro_contributions(rec.snapshot.macro_signals, settings)
+    tailwinds = [signal.tailwind for signal in rec.snapshot.macro_signals]
     return ScreenRow(
         symbol=rec.snapshot.symbol,
         name=rec.snapshot.name or c.name,
@@ -104,7 +109,12 @@ def _row_from_recommendation(c: Constituent, rec: Recommendation) -> ScreenRow:
         thesis=list(rec.verdict.thesis[:4]),
         provider=rec.provider,
         macro_points=rec.quant.macro_adjustment,
+        macro_tailwind=(round(sum(tailwinds) / len(tailwinds), 3) if tailwinds else None),
+        macro_signal_count=len(rec.snapshot.macro_signals),
+        macro_refreshed_count=sum(1 for signal in rec.snapshot.macro_signals if signal.fetched_at),
+        macro_seed_count=sum(1 for signal in rec.snapshot.macro_signals if not signal.fetched_at),
         macro_signals=list(rec.snapshot.macro_signals),
+        macro_breakdown=macro,
         budget_tailwind=bud.tailwind if bud is not None else None,
         budget_drivers=list(bud.drivers) if bud is not None else [],
     )
@@ -141,7 +151,7 @@ def _scan_one(
                 cache.put_snapshot(snapshot, cache_key=snapshot_cache_key)
 
         rec = analyze_snapshot(snapshot, provider=provider, settings=settings)
-        return _row_from_recommendation(c, rec)
+        return _row_from_recommendation(c, rec, settings)
     except Exception as e:  # bad ticker, no history, provider blow-up — isolate it
         return ScreenRow(symbol=c.symbol, name=c.name, sector=c.sector, error=str(e))
 
