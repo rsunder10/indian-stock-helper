@@ -27,6 +27,7 @@ import sys
 import time
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -46,7 +47,9 @@ _HEADERS = {
 }
 
 
-def _get(client: httpx.Client, url: str, params: dict, *, retries: int = 3, backoff: float = 0.8):
+def _get(
+    client: httpx.Client, url: str, params: dict, *, retries: int = 3, backoff: float = 0.8
+) -> Any:
     """GET with simple exponential-backoff retries (transient 5xx / network blips)."""
     last: Exception | None = None
     for attempt in range(retries):
@@ -60,7 +63,7 @@ def _get(client: httpx.Client, url: str, params: dict, *, retries: int = 3, back
     raise last  # type: ignore[misc]
 
 
-def _num(v) -> float | None:
+def _num(v: object) -> float | None:
     """Parse an OGD numeric cell (may be an int, float, or a string with commas)."""
     if v is None:
         return None
@@ -123,7 +126,14 @@ def _match_head(referenced_head: str, fetched_name: str) -> bool:
     return a == b or a in b or b in a
 
 
-def refresh(year, resource, api_key, fields, row_filter, dry_run) -> int:
+def refresh(
+    year: str,
+    resource: str | None,
+    api_key: str | None,
+    fields: dict[str, str],
+    row_filter: tuple[str, str] | None,
+    dry_run: bool,
+) -> int:
     pack_path = _DATA_DIR / f"budget_{year}.json"
     if not pack_path.is_file():
         print(

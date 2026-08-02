@@ -7,10 +7,18 @@ from indi_analyst.analysis.scoring import score as quant_score
 from indi_analyst.analysis.snapshot import DEFAULT_NEWS_SOURCE, build_snapshot
 from indi_analyst.analysis.valuation import compute_valuation
 from indi_analyst.config import Settings, get_settings
+from indi_analyst.datasources.base import NewsSource, PriceSource
 from indi_analyst.llm.base import LLMProvider, ProviderError
 from indi_analyst.llm.factory import build_provider_with_fallback
 from indi_analyst.llm.rulebased import RuleBasedProvider
-from indi_analyst.models import Recommendation, StockSnapshot
+from indi_analyst.models import (
+    AnalystVerdict,
+    QuantScore,
+    Recommendation,
+    StockSnapshot,
+    TradeLevels,
+    Valuation,
+)
 
 
 def analyze(
@@ -18,8 +26,8 @@ def analyze(
     *,
     provider: str | None = None,
     settings: Settings | None = None,
-    price_source=None,
-    news_source=DEFAULT_NEWS_SOURCE,
+    price_source: PriceSource | None = None,
+    news_source: NewsSource | None = DEFAULT_NEWS_SOURCE,
 ) -> Recommendation:
     """Full pipeline. `provider` overrides the configured default; sources are injectable."""
     settings = settings or get_settings()
@@ -66,7 +74,13 @@ def analyze_snapshot(
     )
 
 
-def _run_verdict(llm: LLMProvider, snapshot, levels, quant, valuation):
+def _run_verdict(
+    llm: LLMProvider,
+    snapshot: StockSnapshot,
+    levels: TradeLevels,
+    quant: QuantScore,
+    valuation: Valuation,
+) -> AnalystVerdict:
     """Call the provider; if it fails at request time, degrade to rule-based."""
     try:
         return llm.verdict(snapshot, levels, quant, valuation)

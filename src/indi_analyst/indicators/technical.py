@@ -36,7 +36,9 @@ def rsi(close: pd.Series, period: int = 14) -> pd.Series:
     return out
 
 
-def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9):
+def macd(
+    close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9
+) -> tuple[pd.Series, pd.Series, pd.Series]:
     ema_fast = close.ewm(span=fast, adjust=False).mean()
     ema_slow = close.ewm(span=slow, adjust=False).mean()
     macd_line = ema_fast - ema_slow
@@ -45,7 +47,9 @@ def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9):
     return macd_line, signal_line, hist
 
 
-def bollinger(close: pd.Series, period: int = 20, k: float = 2.0):
+def bollinger(
+    close: pd.Series, period: int = 20, k: float = 2.0
+) -> tuple[pd.Series, pd.Series, pd.Series]:
     mid = close.rolling(period).mean()
     std = close.rolling(period).std()
     return mid + k * std, mid, mid - k * std
@@ -90,7 +94,9 @@ def adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> 
     return dx.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
 
 
-def swing_levels(df: pd.DataFrame, price: float, window: int = 5, lookback: int = 180):
+def swing_levels(
+    df: pd.DataFrame, price: float, window: int = 5, lookback: int = 180
+) -> tuple[list[float], list[float]]:
     """Recent swing highs/lows split into supports (below price) and resistances (above)."""
     recent = df.tail(lookback)
     highs, lows = recent["High"], recent["Low"]

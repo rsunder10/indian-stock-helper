@@ -58,7 +58,7 @@ def _fetch_latest_cpi(resource: str, api_key: str, field: str) -> float | None:
     return None
 
 
-def refresh(args) -> int:
+def refresh(args: argparse.Namespace) -> int:
     pack_path = _DATA_DIR / f"rates_{args.version}.json"
     if not pack_path.is_file():
         print(

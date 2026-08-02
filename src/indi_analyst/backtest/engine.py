@@ -14,6 +14,7 @@ from indi_analyst.backtest.metrics import aggregate
 from indi_analyst.backtest.models import BacktestResult, SymbolResult
 from indi_analyst.backtest.simulator import simulate_symbol
 from indi_analyst.config import Settings, get_settings
+from indi_analyst.datasources.base import PriceSource
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.screener.universe import INDEX_UNIVERSES, _to_yf_symbol, load_universe
 
@@ -33,7 +34,7 @@ def run_backtest(
     target: str,
     *,
     settings: Settings | None = None,
-    price_source=None,
+    price_source: PriceSource | None = None,
     limit: int | None = None,
     on_progress: ProgressCb | None = None,
 ) -> BacktestResult:

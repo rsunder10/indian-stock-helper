@@ -11,6 +11,7 @@ downstream into a recommendation.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from typing import Any
 
 import pandas as pd
 import yfinance as yf
@@ -29,7 +30,7 @@ def _split_ratio(v: float) -> str | None:
 
 
 def _corporate_actions(
-    actions,
+    actions: object,
     *,
     as_of: date | None,
     lookback_years: int,
@@ -92,7 +93,7 @@ def _corporate_actions(
     )
 
 
-def _earnings_date(calendar) -> datetime | None:
+def _earnings_date(calendar: object) -> datetime | None:
     """Extract the next earnings date from yfinance's calendar (dict or DataFrame), else None.
 
     yfinance returns either a ``dict`` (``{"Earnings Date": [date, ...], ...}``) on newer
@@ -125,7 +126,7 @@ def _earnings_date(calendar) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
-def _f(value) -> float | None:
+def _f(value: Any) -> float | None:
     """Coerce yfinance's mixed-type .info values to float or None."""
     try:
         if value is None:
@@ -336,7 +337,7 @@ class YFinanceSource:
             split_recency_days=split_recency_days,
         )
 
-    def _next_earnings_date(self, symbol: str):
+    def _next_earnings_date(self, symbol: str) -> datetime | None:
         """Best-effort next results date from Yahoo's calendar. None on any failure/absence."""
         self._limiter.acquire()
         try:

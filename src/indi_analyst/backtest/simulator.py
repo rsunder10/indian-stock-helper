@@ -38,9 +38,9 @@ def parse_entry_actions(raw: str) -> set[Action]:
 
 
 def resolve_exit(
-    highs,
-    lows,
-    closes,
+    highs: pd.Series,
+    lows: pd.Series,
+    closes: pd.Series,
     *,
     entry_idx: int,
     stop: float,

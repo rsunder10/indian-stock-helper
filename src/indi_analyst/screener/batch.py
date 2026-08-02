@@ -15,6 +15,7 @@ from hashlib import sha256
 from indi_analyst.analysis.engine import analyze_snapshot
 from indi_analyst.analysis.snapshot import DEFAULT_NEWS_SOURCE, build_snapshot
 from indi_analyst.config import Settings, get_settings
+from indi_analyst.datasources.base import NewsSource, PriceSource
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.models import Recommendation
 from indi_analyst.screener.cache import ScanCache
@@ -24,7 +25,9 @@ from indi_analyst.screener.universe import load_universe
 ProgressCb = Callable[[int, int, str], None]
 
 
-def _snapshot_cache_key(settings: Settings, price_source, news_source) -> str:
+def _snapshot_cache_key(
+    settings: Settings, price_source: PriceSource, news_source: NewsSource | None
+) -> str:
     """Hash the inputs that change a cached deterministic snapshot.
 
     The DB cache is intentionally short-lived, but a symbol alone is not enough: changing the
@@ -114,8 +117,8 @@ def _scan_one(
     settings: Settings,
     cache: ScanCache | None,
     use_cache: bool,
-    price_source,
-    news_source,
+    price_source: PriceSource,
+    news_source: NewsSource | None,
     snapshot_cache_key: str,
 ) -> ScreenRow:
     """Scan a single constituent. Never raises — failures become an errored row."""
@@ -148,8 +151,8 @@ def scan_universe(
     *,
     provider: str | None = None,
     settings: Settings | None = None,
-    price_source=None,
-    news_source=DEFAULT_NEWS_SOURCE,
+    price_source: PriceSource | None = None,
+    news_source: NewsSource | None = DEFAULT_NEWS_SOURCE,
     limit: int | None = None,
     use_cache: bool = True,
     persist: bool = True,

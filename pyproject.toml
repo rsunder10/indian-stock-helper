@@ -94,10 +94,11 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 warn_unused_configs = true
 no_implicit_optional = true
-# Check the bodies of even un-annotated functions so real type errors surface, but don't force a
-# full annotation campaign on internal helpers / duck-typed source params (out of scope here).
-# Tightening to disallow_incomplete_defs is a good follow-up once annotations are backfilled.
+# Full annotation coverage is enforced on our own code (src + scripts). Third-party gaps are handled
+# by the per-module overrides below; tests are intentionally out of `files` and stay annotation-free.
 check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
 
 # Untyped third-party libraries (no stubs, or optional SDKs imported lazily) — silence import
 # errors only; we still type-check our own code that uses them.
@@ -131,10 +132,10 @@ omit = ["*/app/dashboard.py"]  # Streamlit UI is exercised manually, not in the 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-# Regression floor, not an aspiration: the deterministic core sits well above this; the interactive
-# CLI and network-only LLM providers are exercised manually, not in the offline suite. Ratchet up
-# as those gaps get covered.
-fail_under = 60
+# Regression floor, not an aspiration (the suite currently sits at ~84%). The remaining gaps are
+# code that needs live services: the network-only branches of the cloud LLM providers and the
+# Streamlit dashboard (omitted above). Ratchet up as those get covered.
+fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",

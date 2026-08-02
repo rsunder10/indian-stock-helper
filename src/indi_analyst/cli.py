@@ -21,9 +21,9 @@ from indi_analyst.analysis.engine import analyze
 from indi_analyst.analysis.macro import national_context
 from indi_analyst.analysis.valuation import explain_valuation
 from indi_analyst.backtest import run_backtest
-from indi_analyst.backtest.models import BacktestResult, BacktestStats
+from indi_analyst.backtest.models import BacktestResult, BacktestStats, Trade
 from indi_analyst.config import get_settings
-from indi_analyst.models import Action, Recommendation
+from indi_analyst.models import Action, CorporateActions, Fundamentals, Recommendation
 from indi_analyst.screener import (
     resolve_preset,
     scan_universe,
@@ -43,7 +43,7 @@ def _plain(text: str) -> str:
     return text.replace("**", "")
 
 
-def _fundamentals_line(f) -> str:
+def _fundamentals_line(f: Fundamentals) -> str:
     """One compact line of the fundamentals that are present. Empty string if none are."""
     parts: list[str] = []
     if f.pe_ratio is not None:
@@ -61,7 +61,7 @@ def _fundamentals_line(f) -> str:
     return "   ".join(parts)
 
 
-def _corporate_actions_lines(ca) -> list[str]:
+def _corporate_actions_lines(ca: CorporateActions | None) -> list[str]:
     """Compact dividend/split history lines. Empty list when the source had no actions."""
     if ca is None:
         return []
@@ -329,13 +329,13 @@ def render_backtest(result: BacktestResult, top: int | None = None) -> str:
     return "\n".join(lines)
 
 
-def _stats_for_symbol(trades):
+def _stats_for_symbol(trades: list[Trade]) -> BacktestStats:
     from indi_analyst.backtest.metrics import compute_stats
 
     return compute_stats(trades)
 
 
-def _build_filter(args) -> ScreenFilter | None:
+def _build_filter(args: argparse.Namespace) -> ScreenFilter | None:
     """Assemble a ScreenFilter from CLI flags, starting from a preset if given."""
     flt = resolve_preset(args.preset) if args.preset else ScreenFilter()
     data = flt.model_dump()
@@ -356,7 +356,7 @@ def _build_filter(args) -> ScreenFilter | None:
     return flt if flt.model_dump(exclude_none=True) else None
 
 
-def _cmd_analyze(args) -> int:
+def _cmd_analyze(args: argparse.Namespace) -> int:
     try:
         rec = analyze(args.query, provider=args.provider)
     except Exception as e:  # data errors, bad ticker, etc.
@@ -366,7 +366,7 @@ def _cmd_analyze(args) -> int:
     return 0
 
 
-def _cmd_screen(args) -> int:
+def _cmd_screen(args: argparse.Namespace) -> int:
     def _progress(done: int, total: int, symbol: str) -> None:
         print(f"\rScanning {done}/{total} … {symbol:<16}", end="", file=sys.stderr, flush=True)
 
@@ -419,7 +419,7 @@ def _cmd_screen(args) -> int:
     return 0
 
 
-def _cmd_backtest(args) -> int:
+def _cmd_backtest(args: argparse.Namespace) -> int:
     settings = get_settings()
     if args.period:
         settings.backtest_history_period = args.period

@@ -23,7 +23,7 @@ if you `uv run pre-commit install`):
 uv run ruff check .          # lint
 uv run ruff format .         # auto-format (use --check in CI)
 uv run mypy                  # static type check (src + scripts)
-uv run pytest --cov          # tests with coverage (fails under 60%)
+uv run pytest --cov          # tests with coverage (fails under 80%)
 ```
 
 Use injected or fixture-backed sources for tests. Do not make live market-data calls in the test suite.

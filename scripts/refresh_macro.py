@@ -64,7 +64,7 @@ def _fetch_latest_value(resource: str, api_key: str, field: str) -> float | None
     return None
 
 
-def refresh(args) -> int:
+def refresh(args: argparse.Namespace) -> int:
     if args.kind not in _KINDS:
         print(
             f"  ✗ unknown --kind {args.kind!r}; expected one of {sorted(_KINDS)}", file=sys.stderr

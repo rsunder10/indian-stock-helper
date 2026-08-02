@@ -3,25 +3,29 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pandas as pd
 
 from indi_analyst.analysis.macro import resolve_macro_signals
 from indi_analyst.config import Settings, get_settings
+from indi_analyst.datasources.base import NewsSource, PriceSource
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.datasources.news import GoogleNewsSource, aggregate_sentiment
 from indi_analyst.indicators import technical
 from indi_analyst.models import Fundamentals, StockSnapshot
 
-DEFAULT_NEWS_SOURCE = object()
+# Sentinel distinguishing "caller said nothing" (→ default Google News) from an explicit None
+# (→ news disabled). Typed Any so it can serve as the default for a `NewsSource | None` parameter.
+DEFAULT_NEWS_SOURCE: Any = object()
 
 
 def build_snapshot(
     query: str,
     *,
     settings: Settings | None = None,
-    price_source=None,
-    news_source=DEFAULT_NEWS_SOURCE,
+    price_source: PriceSource | None = None,
+    news_source: NewsSource | None = DEFAULT_NEWS_SOURCE,
 ) -> StockSnapshot:
     """Resolve a query to a full snapshot. Sources are injectable for testing."""
     settings = settings or get_settings()

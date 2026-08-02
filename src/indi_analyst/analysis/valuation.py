@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from math import sqrt
 
 from indi_analyst.config import Settings, get_settings
-from indi_analyst.models import Conviction, StockSnapshot, Valuation, ValuationMethod
+from indi_analyst.models import Conviction, Fundamentals, StockSnapshot, Valuation, ValuationMethod
 
 # A single method estimate outside this band (× current price) is treated as unreliable
 # and dropped from the blend, so one wild number can't distort the fair value.
@@ -30,7 +30,7 @@ _SANITY_LOW = 0.1
 _SANITY_HIGH = 10.0
 
 
-def _growth(f) -> float | None:
+def _growth(f: Fundamentals) -> float | None:
     """Preferred growth input: earnings growth, falling back to revenue growth."""
     if f.earnings_growth is not None:
         return f.earnings_growth

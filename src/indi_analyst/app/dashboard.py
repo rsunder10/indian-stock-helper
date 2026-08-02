@@ -15,7 +15,7 @@ from indi_analyst.analysis.macro import national_context
 from indi_analyst.analysis.valuation import explain_valuation
 from indi_analyst.backtest import run_backtest
 from indi_analyst.backtest.models import BacktestResult, BacktestStats
-from indi_analyst.config import get_settings
+from indi_analyst.config import Settings, get_settings
 from indi_analyst.datasources.factory import build_price_source
 from indi_analyst.indicators import technical
 from indi_analyst.models import Action, Recommendation
@@ -343,7 +343,7 @@ def _deep_dive(rec: Recommendation, df: pd.DataFrame) -> None:
     st.caption(rec.disclaimer)
 
 
-def _single_stock_view(settings, provider: str) -> None:
+def _single_stock_view(settings: Settings, provider: str) -> None:
     with st.sidebar:
         query = st.text_input(
             "Ticker / symbol", value="RELIANCE", help="e.g. RELIANCE, TCS, INFY.NS"
@@ -366,7 +366,7 @@ def _single_stock_view(settings, provider: str) -> None:
     _deep_dive(rec, df)
 
 
-def _screener_view(settings, provider: str) -> None:
+def _screener_view(settings: Settings, provider: str) -> None:
     with st.sidebar:
         universe = st.selectbox("Universe", ["nifty50", "nifty200", "nifty500"], index=0)
         limit = st.slider(
@@ -504,7 +504,7 @@ def _bt_stats_row(name: str, s: BacktestStats) -> dict:
     }
 
 
-def _backtest_view(settings) -> None:
+def _backtest_view(settings: Settings) -> None:
     with st.sidebar:
         target = st.text_input(
             "Symbol or universe",

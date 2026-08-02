@@ -11,10 +11,11 @@ at my back?" number); `budget_tailwind` is retained as a back-compatible single-
 
 from __future__ import annotations
 
+from indi_analyst.models import SectorMacroSignal
 from indi_analyst.screener.models import ScreenRow, SectorSummary
 
 
-def _representative_signals(rows: list[ScreenRow]):
+def _representative_signals(rows: list[ScreenRow]) -> list[SectorMacroSignal]:
     """The macro overlays for the sector — a per-sector constant, so take the first row that has them."""
     return next((r.macro_signals for r in rows if r.macro_signals), [])
 
@@ -41,6 +42,7 @@ def summarize_sectors(rows: list[ScreenRow], *, top_symbols: int = 3) -> list[Se
         scores = [s for r in ranked if (s := r.score) is not None]
 
         signals = _representative_signals(ranked)
+        macro_tailwind: float | None
         if signals:
             macro_tailwind = round(sum(s.tailwind for s in signals) / len(signals), 3)
             overlays = [s.label for s in signals]
